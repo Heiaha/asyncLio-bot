@@ -130,42 +130,39 @@ class Game:
         return message
 
     async def play(self):
-        try:
-            ping_counter = 0
-            async for event in self.li.watch_game_stream(self.id):
-                if event["type"] == "gameFull":
-                    # on lichess restarts a gameFull message will be sent, even if the game is underway.
-                    # check if we've already done a setup
-                    if self.status is None:
-                        await self._setup(event)
-                    else:
-                        self._update(event["state"])
+        ping_counter = 0
+        async for event in self.li.watch_game_stream(self.id):
+            if event["type"] == "gameFull":
+                # on lichess restarts a gameFull message will be sent, even if the game is underway.
+                # check if we've already done a setup
+                if self.status is None:
+                    await self._setup(event)
+                else:
+                    self._update(event["state"])
 
-                    if self._is_our_turn():
-                        await self._make_move()
+                if self._is_our_turn():
+                    await self._make_move()
 
-                elif event["type"] == "gameState":
-                    self._update(event)
+            elif event["type"] == "gameState":
+                self._update(event)
 
-                    if self._is_game_over():
-                        print(self._get_result_message(event.get("winner")))
-                        break
+                if self._is_game_over():
+                    print(self._get_result_message(event.get("winner")))
+                    break
 
-                    if self._is_our_turn():
-                        await self._make_move()
+                if self._is_our_turn():
+                    await self._make_move()
 
-                elif event["type"] == "ping":
-                    ping_counter += 1
+            elif event["type"] == "ping":
+                ping_counter += 1
 
-                    if (
-                        ping_counter >= 7
-                        and len(self.board.move_stack) < 2
-                        and not self._is_our_turn()
-                    ):
-                        await self.li.abort_game(self.id)
-                        break
+                if (
+                    ping_counter >= 7
+                    and len(self.board.move_stack) < 2
+                    and not self._is_our_turn()
+                ):
+                    await self.li.abort_game(self.id)
+                    break
 
-            print("Quitting engine.")
-            await self.engine.quit()
-        except Exception as e:
-            print(e)
+        print("Quitting engine.")
+        await self.engine.quit()
