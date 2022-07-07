@@ -1,24 +1,21 @@
-import asyncio
 import chess
 import chess.engine
 import chess.polyglot
+
+from config import CONFIG
 from enums import GameStatus
 from lichess import Lichess
 
 
 class Game:
-    def __init__(self, li: Lichess, config: dict, info: dict):
+    def __init__(self, li: Lichess, game_id: str):
         self.li: Lichess = li
-        self.config: dict = config
-        self.id: str = info["game"]["id"]
-        self.initial_fen: str = info["game"]["fen"]
-        self.board: chess.Board = chess.Board(info["game"]["fen"])
-        self.color: chess.Color = chess.WHITE if info["game"][
-            "color"
-        ] == "white" else chess.BLACK
-        self.move_overhead: int = 0
+        self.id: str = game_id
+        self.board: chess.Board = chess.Board()
 
         # attributes to be set up asynchronously or when the game starts
+        self.color: chess.Color | None = None
+        self.initial_fen: str | None = None
         self.white_time: int | None = None
         self.black_time: int | None = None
         self.increment: int | None = None
@@ -28,19 +25,27 @@ class Game:
         self.engine: chess.engine.UciProtocol | None = None
 
     async def _setup(self, event):
+        if (fen := event["initialFen"]) != "startpos":
+            self.initial_fen = fen
+            self.board = chess.Board(fen)
         self.white_time = event["state"]["wtime"]
         self.black_time = event["state"]["btime"]
         self.increment = event["clock"]["increment"]
-        self.white_name: str = event["white"].get("name", "AI")
-        self.black_name: str = event["black"].get("name", "AI")
+        self.white_name = event["white"].get("name", "AI")
+        self.black_name = event["black"].get("name", "AI")
         self.status = GameStatus(event["state"]["status"])
+        self.color = chess.WHITE if self.white_name == self.li.username else chess.BLACK
 
-        transport, engine = await chess.engine.popen_uci(self.config["engine"]["path"])
-        await engine.configure(self.config["engine"]["uci_options"])
+        transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
+        await engine.configure(CONFIG["engine"]["uci_options"])
         self.engine = engine
 
     def _update(self, event):
-        self.board = chess.Board(self.initial_fen)
+
+        if self.initial_fen:
+            self.board = chess.Board(self.initial_fen)
+        else:
+            self.board = chess.Board()
 
         move_strs = event["moves"].split()
         for move_str in move_strs:
@@ -51,19 +56,13 @@ class Game:
         self.status = GameStatus(event["status"])
 
     def _is_game_over(self):
-        return (
-            self.board.is_checkmate()
-            or self.board.is_stalemate()
-            or self.board.is_insufficient_material()
-            or self.board.is_fifty_moves()
-            or self.board.is_repetition()
-        )
+        return self.status != GameStatus.STARTED
 
     def _is_our_turn(self):
         return self.color == self.board.turn
 
     def _make_book_move(self) -> chess.Move | None:
-        if self.board.ply() > self.config["book"]["depth"]:
+        if self.board.ply() > CONFIG["book"]["depth"]:
             return
         with chess.polyglot.open_reader("komodo.bin") as reader:
             try:
@@ -79,29 +78,11 @@ class Game:
         if len(self.board.move_stack) < 2:
             limit = chess.engine.Limit(time=10)
         else:
-            if self.color == chess.WHITE:
-                white_time = (
-                    self.white_time - self.move_overhead
-                    if self.white_time > self.white_time > self.move_overhead
-                    else self.white_time / 2
-                )
-                white_time /= 1000
-                black_time = self.black_time / 1000
-            else:
-                black_time = (
-                    self.black_time - self.move_overhead
-                    if self.black_time > self.move_overhead
-                    else self.black_time / 2
-                )
-                black_time /= 1000
-                white_time = self.white_time / 1000
-            increment = self.increment / 1000
-
             limit = chess.engine.Limit(
-                white_clock=white_time,
-                black_clock=black_time,
-                white_inc=increment,
-                black_inc=increment,
+                white_clock=self.white_time / 1000,
+                black_clock=self.black_time / 1000,
+                white_inc=self.increment / 1000,
+                black_inc=self.increment / 1000,
             )
 
         result = await self.engine.play(self.board, limit, info=chess.engine.INFO_ALL)
@@ -149,43 +130,42 @@ class Game:
         return message
 
     async def play(self):
+        try:
+            ping_counter = 0
+            async for event in self.li.watch_game_stream(self.id):
+                if event["type"] == "gameFull":
+                    # on lichess restarts a gameFull message will be sent, even if the game is underway.
+                    # check if we've already done a setup
+                    if self.status is None:
+                        await self._setup(event)
+                    else:
+                        self._update(event["state"])
 
-        ping_counter = 0
-        async for event in self.li.watch_game_stream(self.id):
-            if event["type"] == "gameFull":
-                # on lichess restarts a gameFull message will be sent, even if the game is underway.
-                # check if we've already done a setup
-                if self.status is None:
-                    await self._setup(event)
-                else:
-                    self._update(event["state"])
+                    if self._is_our_turn():
+                        await self._make_move()
 
-                if self._is_our_turn():
-                    await self._make_move()
+                elif event["type"] == "gameState":
+                    self._update(event)
 
-            elif event["type"] == "gameState":
-                self._update(event)
+                    if self._is_game_over():
+                        print(self._get_result_message(event.get("winner")))
+                        break
 
-                if self.status != GameStatus.STARTED:
-                    print(self._get_result_message(event.get("winner")))
-                    break
+                    if self._is_our_turn():
+                        await self._make_move()
 
-                if self._is_game_over():
-                    continue
+                elif event["type"] == "ping":
+                    ping_counter += 1
 
-                if self._is_our_turn():
-                    await self._make_move()
+                    if (
+                        ping_counter >= 7
+                        and len(self.board.move_stack) < 2
+                        and not self._is_our_turn()
+                    ):
+                        await self.li.abort_game(self.id)
+                        break
 
-            elif event["type"] == "ping":
-                ping_counter += 1
-
-                if (
-                    ping_counter >= 7
-                    and len(self.board.move_stack) < 2
-                    and not self._is_our_turn()
-                ):
-                    await self.li.abort_game(self.id)
-                    break
-
-        print("Quitting engine.")
-        await self.engine.quit()
+            print("Quitting engine.")
+            await self.engine.quit()
+        except Exception as e:
+            print(e)

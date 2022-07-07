@@ -1,14 +1,13 @@
 import asyncio
 
-from lichess import Lichess
 from game_manager import GameManager
+from lichess import Lichess
 
 
 class EventHandler:
-    def __init__(self, li: Lichess, config: dict):
+    def __init__(self, li: Lichess):
         self.li: Lichess = li
-        self.game_manager: GameManager = GameManager(li, config)
-        self.config: dict = config
+        self.game_manager: GameManager = GameManager(li)
 
     async def run(self):
         asyncio.create_task(self.game_manager.run())
@@ -24,9 +23,6 @@ class EventHandler:
 
             elif event["type"] == "challenge":
                 await self.game_manager.on_challenge(event)
-
-            elif event["type"] == "challengeCanceled":
-                self.game_manager.on_challenge_cancel(event)
 
             elif event["type"] == "challengeDeclined":
                 continue

@@ -1,11 +1,14 @@
-import chess
 import json
+
+import chess
 import httpx
+
+from config import CONFIG
 
 
 class Lichess:
-    def __init__(self, config: dict):
-        self.token = config["token"]
+    def __init__(self):
+        self.token = CONFIG["token"]
         self.headers = {
             "Authorization": f"Bearer {self.token}",
         }
@@ -15,8 +18,8 @@ class Lichess:
         self.username: str | None = None
 
     @classmethod
-    async def create(cls, config: dict):
-        li = cls(config)
+    async def create(cls):
+        li = cls()
         li.username = (await li.get_account())["username"]
         return li
 
@@ -87,7 +90,7 @@ class Lichess:
             response = await self.client.post(
                 f"https://lichess.org/api/challenge/{challenge['opponent']}",
                 data={
-                    "rated": "false",
+                    "rated": "true" if CONFIG["matchmaking"]["rated"] else "false",
                     "clock.limit": challenge["tc_seconds"],
                     "clock.increment": challenge["tc_increment"],
                     "color": "random",

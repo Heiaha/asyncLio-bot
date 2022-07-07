@@ -1,4 +1,6 @@
 import random
+
+from config import CONFIG
 from lichess import Lichess
 
 
@@ -41,9 +43,8 @@ class Bot:
 
 
 class Matchmaker:
-    def __init__(self, li: Lichess, config: dict):
+    def __init__(self, li: Lichess):
         self.li: Lichess = li
-        self.config: dict = config
 
     async def challenge(self):
 
@@ -51,8 +52,8 @@ class Matchmaker:
         me = next(bot for bot in bots if bot.name == self.li.username)
         random.shuffle(bots)
 
-        tc_seconds = random.choice(self.config["matchmaking"]["initial_times"])
-        tc_increment = random.choice(self.config["matchmaking"]["increments"])
+        tc_seconds = random.choice(CONFIG["matchmaking"]["initial_times"])
+        tc_increment = random.choice(CONFIG["matchmaking"]["increments"])
         tc_name = classify_tc(tc_seconds, tc_increment)
 
         for bot in bots:
@@ -62,11 +63,11 @@ class Matchmaker:
 
             if (
                 abs(bot.rating(tc_name) - me.rating(tc_name))
-                > self.config["matchmaking"]["max_rating_diff"]
+                > CONFIG["matchmaking"]["max_rating_diff"]
             ):
                 continue
 
-            if bot.total_games < self.config["matchmaking"]["min_games"]:
+            if bot.total_games < CONFIG["matchmaking"]["min_games"]:
                 continue
 
             print(
