@@ -70,7 +70,7 @@ class GameManager:
 
     @staticmethod
     def _should_accept(event: dict) -> bool:
-        enabled = CONFIG["challenge"]["enabled"]
+
         allowed_variants = CONFIG["challenge"]["variants"]
         allowed_tcs = CONFIG["challenge"]["time_controls"]
         min_increment = CONFIG["challenge"].get("min_increment", 0)
@@ -78,18 +78,19 @@ class GameManager:
         min_initial = CONFIG["challenge"].get("min_initial", 0)
         max_initial = CONFIG["challenge"].get("max_initial", 315360000)
 
-        increment = event["challenge"]["timeControl"].get("increment")
-        initial = event["challenge"]["timeControl"].get("limit")
-        variant = event["challenge"]["variant"]["key"]
-        tc = event["challenge"]["speed"]
-
+        enabled = CONFIG["challenge"]["enabled"]
         if not enabled:
             return False
 
+        variant = event["challenge"]["variant"]["key"]
         if variant not in allowed_variants:
             return False
 
-        if tc not in allowed_tcs:
+        increment = event["challenge"]["timeControl"].get("increment")
+        initial = event["challenge"]["timeControl"].get("limit")
+        speed = event["challenge"]["speed"]
+
+        if speed not in allowed_tcs:
             return False
 
         if not (min_initial <= initial <= max_initial):
