@@ -13,7 +13,8 @@ def _is_final_error(e: Exception) -> bool:
     return isinstance(e, httpx.HTTPStatusError) and e.response.status_code < 500
 
 
-# If backoff.on_exception times out, it will return the exception here.
+# If backoff.on_exception times out or gives up,
+# it will return the exception here in this decorator.
 # Catch if it is a httpx.HTTPStatusError
 def _catch_status_code(f: Callable):
     async def wrapper(*args, **kwargs):
@@ -35,13 +36,21 @@ class Lichess:
 
         self.client = httpx.AsyncClient(headers=self.headers)
 
-        self.username: str | None = None
+        self.user: dict | None = None
 
     @classmethod
     async def create(cls):
         li = cls()
-        li.username = (await li.get_account())["username"]
+        li.user = await li.get_account()
         return li
+
+    @property
+    def username(self):
+        return self.user["username"]
+
+    @property
+    def title(self):
+        return self.user.get("title")
 
     async def watch_control_stream(self):
         while True:
@@ -113,10 +122,10 @@ class Lichess:
                     "rated": str(CONFIG["matchmaking"]["rated"]).lower(),
                     "clock.limit": challenge["tc_seconds"],
                     "clock.increment": challenge["tc_increment"],
+                    "variant": CONFIG["matchmaking"]["variant"],
                     "color": "random",
-                    "variant": "standard",
                 },
-                timeout=30,
+                timeout=20,
             )
             response.raise_for_status()
             return True
@@ -163,3 +172,14 @@ class Lichess:
             f"https://lichess.org/api/bot/game/{game_id}/abort"
         )
         response.raise_for_status()
+
+    async def upgrade_account(self) -> bool:
+        try:
+            response = await self.client.post(
+                "https://lichess.org/api/bot/account/upgrade"
+            )
+            response.raise_for_status()
+            return True
+        except httpx.HTTPStatusError as e:
+            logging.error(e)
+            return False

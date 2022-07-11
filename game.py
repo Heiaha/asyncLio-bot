@@ -1,10 +1,11 @@
 import chess
 import chess.engine
 import chess.polyglot
+import chess.variant
 import logging
 
 from config import CONFIG
-from enums import GameStatus, GameEvent
+from enums import GameStatus, GameEvent, Variant
 from lichess import Lichess
 
 
@@ -14,7 +15,7 @@ class Game:
         self.id: str = game_id
         self.board: chess.Board = chess.Board()
 
-        # attributes to be set up asynchronously or when the game starts
+        # attributes to be set up asynchronously when the game starts
         self.color: chess.Color | None = None
         self.initial_fen: str | None = None
         self.white_time: int | None = None
@@ -23,38 +24,51 @@ class Game:
         self.white_name: str | None = None
         self.black_name: str | None = None
         self.status: GameStatus | None = None
+        self.variant: Variant | None = None
         self.engine: chess.engine.UciProtocol | None = None
 
     async def _setup(self, event):
         if (fen := event["initialFen"]) != "startpos":
             self.initial_fen = fen
-            self.board = chess.Board(fen)
+        else:
+            self.initial_fen = chess.STARTING_FEN
+
         self.white_time = event["state"]["wtime"]
         self.black_time = event["state"]["btime"]
         self.increment = event["clock"]["increment"]
         self.white_name = event["white"].get("name", "AI")
         self.black_name = event["black"].get("name", "AI")
         self.status = GameStatus(event["state"]["status"])
+        self.variant = Variant(event["variant"]["key"])
         self.color = chess.WHITE if self.white_name == self.li.username else chess.BLACK
 
+        self.board = self._setup_board(event["state"])
+
         transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
-        await engine.configure(CONFIG["engine"]["uci_options"])
+        if options := CONFIG["engine"].get("uci_options"):
+            await engine.configure(options)
         self.engine = engine
 
-    def _update(self, event):
+    def _update(self, event: dict):
 
-        if self.initial_fen:
-            self.board = chess.Board(self.initial_fen)
-        else:
-            self.board = chess.Board()
-
-        move_strs = event["moves"].split()
-        for move_str in move_strs:
-            self.board.push_uci(move_str)
-
+        self.board = self._setup_board(event)
         self.white_time = event["wtime"]
         self.black_time = event["btime"]
         self.status = GameStatus(event["status"])
+
+    def _setup_board(self, event: dict) -> chess.Board:
+        if self.variant == Variant.CHESS960:
+            board = chess.Board(self.initial_fen, chess960=True)
+        elif self.variant == Variant.FROM_POSITION:
+            board = chess.Board(self.initial_fen)
+        else:
+            board = chess.variant.find_variant(self.variant.value)()
+
+        move_strs = event["moves"].split()
+        for move_str in move_strs:
+            board.push_uci(move_str)
+
+        return board
 
     def _is_game_over(self):
         return self.status != GameStatus.STARTED
@@ -63,7 +77,20 @@ class Game:
         return self.color == self.board.turn
 
     def _get_book_move(self) -> chess.Move | None:
-        with chess.polyglot.open_reader("komodo.bin") as reader:
+        if not CONFIG["book"]["enabled"]:
+            return
+
+        if self.board.chess960 and (chess960_path := CONFIG["book"].get("chess960")):
+            book_path = chess960_path
+        elif standard_path := CONFIG["book"].get("standard"):
+            book_path = standard_path
+        else:
+            return
+
+        if self.board.ply() > CONFIG["book"].get("depth", 10):
+            return
+
+        with chess.polyglot.open_reader(book_path) as reader:
             try:
                 move = reader.weighted_choice(self.board).move
                 new_board = self.board.copy()
@@ -90,18 +117,49 @@ class Game:
         raise RuntimeError("Engine could not make a move.")
 
     async def _get_move(self):
-        if self.board.ply() <= CONFIG["book"]["depth"] and (
-            move := self._get_book_move()
-        ):
+        if move := self._get_book_move():
             message = f"Book: {move.uci()}"
         else:
             move, info = await self._get_engine_move()
-            message = f"Engine {move.uci()} {info}"
+            message = self._format_engine_move_message(move, info)
 
         logging.info(message)
         await self.li.make_move(self.id, move)
 
-    def _get_result_message(self, winner: str | None) -> str:
+    def _format_engine_move_message(self, move: chess.Move, info: chess.engine.InfoDict):
+        message = ""
+        if self.board.turn:
+            move_number = str(self.board.fullmove_number) + "."
+            message += f"{move_number:4} {self.board.san(move):<10}"
+        else:
+            move_number = str(self.board.fullmove_number) + "..."
+            message += f"{move_number:6} {self.board.san(move):<10}"
+
+        if score := info.get(
+            "score", chess.engine.PovScore(chess.engine.Cp(0), self.color)
+        ):
+            if moves_to_go := score.pov(self.color).mate():
+                moves_to_go_str = (
+                    f"+{moves_to_go}" if moves_to_go > 0 else f"{moves_to_go}"
+                )
+                message += f"Mate: {moves_to_go_str:<10}"
+            else:
+                if (cp_score := score.pov(self.board.turn).score()) is not None:
+                    score_str = f"+{cp_score}" if cp_score > 0 else f"{cp_score}"
+                    message += f"CP Score: {score_str:<10}"
+
+        if time := info.get("time", 0.0):
+            message += f"Time: {time:<10.1f}"
+
+        if depth := info.get("depth", 1):
+            message += f"Depth: {depth:<10}"
+
+        if pv := info.get("pv"):
+            message += f"PV: {self.board.variation_san(pv)}"
+
+        return message
+
+    def _format_result_message(self, winner: str | None) -> str:
         winning_name = self.white_name if winner == "white" else self.black_name
         losing_name = self.white_name if winner == "black" else self.black_name
 
@@ -127,7 +185,6 @@ class Game:
             message = "Game drawn by stalemate."
         else:
             message = "Game aborted."
-
         return message
 
     async def play(self):
@@ -150,7 +207,8 @@ class Game:
                     self._update(event)
 
                     if self._is_game_over():
-                        logging.info(self._get_result_message(event.get("winner")))
+                        message = self._format_result_message(event.get("winner"))
+                        logging.info(message)
                         break
 
                     if self._is_our_turn():
@@ -167,7 +225,6 @@ class Game:
                         await self.li.abort_game(self.id)
                         break
 
-            logging.info("Quitting engine.")
             await self.engine.quit()
         except Exception as e:
             logging.error(e)

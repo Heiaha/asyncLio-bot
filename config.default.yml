@@ -1,0 +1,53 @@
+token: "XXXXXXXXXXXXXXX"
+engine:
+  path: "/path/to/engine"
+  uci_options:               # Arbitrary UCI options passed to the engine. Can be commented out or changed.
+#    Overhead: 10             # Increase if your bot flags games too often.
+#    Threads: 1               # Max CPU threads the engine can use.
+#    Hash: 128                # Hash size (in MB).
+book:
+  enabled: true
+  standard_path: "path/to/book"
+#  chess960_path: "path/to/960"
+  depth: 10
+challenge:                   # Incoming challenges.
+  enabled: false             # Flag for controlling if any challenges get accepted. Overrides all other flags.
+  concurrency: 1             # Number of games to play simultaneously.
+  max_increment: 60          # Maximum amount of increment to accept a challenge. The max is 180. Set to 0 for no increment.
+  min_increment: 0           # Minimum amount of increment to accept a challenge.
+  max_base: 3600             # Maximum amount of base time to accept a challenge. The max is 315360000 (10 years).
+  min_base: 0                # Minimum amount of base time to accept a challenge.
+  variants:                  # Chess variants to accept (https://lichess.org/variant).
+    - standard
+#    - chess960
+#    - fromPosition
+#    - antichess
+#    - atomic
+#    - crazyhouse
+#    - horde
+#    - kingOfTheHill
+#    - racingKings
+#    - threeCheck
+  time_controls:             # Time controls to accept (does not currently support correspondence).
+    - bullet
+    - blitz
+    - rapid
+    - classical
+matchmaking:
+  enabled: false
+  variant: standard
+  initial_times:             # Initial time for matchmaking mode to be selected at random.
+    - 60
+#    - 120
+#    - 300
+#    - 420
+#    - 600
+#    - 900
+#    - 1800
+#    - 2400
+  increments:                # Increment time for matchmaking mode to be selected at random.
+    - 0
+  max_rating_diff: 4000      # Maximum rating distance to opponent.
+  min_games: 250             # Minimum games opponent must have played.
+  timeout: 300               # Timeout between nothing happening and issuing a challenge.
+  rated: false               # Whether to challenge rated or casual.

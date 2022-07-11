@@ -33,14 +33,35 @@ class GameEvent(Enum):
     CHAT_LINE = "chatLine"
 
 
-class Speed(Enum):
+class Variant(Enum):
+    STANDARD = "standard"
+    FROM_POSITION = "fromPosition"
+    ANTICHESS = "antichess"
+    ATOMIC = "atomic"
+    CHESS960 = "chess960"
+    CRAZYHOUSE = "crazyhouse"
+    HORDE = "horde"
+    KING_OF_THE_HILL = "kingOfTheHill"
+    RACING_KINGS = "racingKings"
+    THREE_CHECK = "threeCheck"
+
+
+class PerfType(Enum):
     BULLET = "bullet"
     BLITZ = "blitz"
     RAPID = "rapid"
     CLASSICAL = "classical"
+    ANTICHESS = "antichess"
+    ATOMIC = "atomic"
+    CHESS960 = "chess960"
+    CRAZYHOUSE = "crazyhouse"
+    HORDE = "horde"
+    KING_OF_THE_HILL = "kingOfTheHill"
+    RACING_KINGS = "racingKings"
+    THREE_CHECK = "threeCheck"
 
     @classmethod
-    def from_tc(cls, tc_seconds: int, tc_increment: int = 0):
+    def from_standard_tc(cls, tc_seconds: int, tc_increment: int = 0):
         duration = tc_seconds + 40 * tc_increment
         if duration < 179:
             return cls.BULLET
@@ -52,3 +73,9 @@ class Speed(Enum):
             return cls.RAPID
 
         return cls.CLASSICAL
+
+    @classmethod
+    def from_nonstandard_variant(cls, variant: Variant):
+        if variant == Variant.FROM_POSITION:
+            raise ValueError("'From Position' not supported as a performance type.")
+        return cls(variant.value)

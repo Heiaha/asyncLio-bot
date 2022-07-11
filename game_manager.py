@@ -40,12 +40,12 @@ class GameManager:
         game = Game(self.li, event["game"]["id"])
         asyncio.create_task(game.play())
         self.current_games += 1
-        logging.info(25 * "-" + f" Current Processes: {self.current_games} " + 25 * "-")
+        logging.info(f"Current Processes: {self.current_games}")
 
     def on_game_finish(self):
         self.event.set()
         self.current_games -= 1
-        logging.info(25 * "-" + f" Current Processes: {self.current_games} " + 25 * "-")
+        logging.info(f"Current Processes: {self.current_games}")
 
     async def on_challenge(self, event: dict):
         challenge_id = event["challenge"]["id"]

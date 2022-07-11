@@ -3,7 +3,7 @@ import logging
 
 from config import CONFIG
 from lichess import Lichess
-from enums import Speed
+from enums import PerfType, Variant
 
 
 class Bot:
@@ -12,19 +12,23 @@ class Bot:
 
         self._ratings = {}
         self._num_games = {}
-        for speed in Speed:
-            self._ratings[speed] = info["perfs"][speed.value]["rating"]
-            self._num_games[speed] = info["perfs"][speed.value]["games"]
+        for perf_type in PerfType:
+            self._ratings[perf_type] = (
+                info["perfs"].get(perf_type.value, {}).get("rating", 1500)
+            )
+            self._num_games[perf_type] = (
+                info["perfs"].get(perf_type.value, {}).get("games", 0)
+            )
 
     @property
     def total_games(self):
         return sum(self._num_games.values())
 
-    def num_games(self, speed):
-        return self._num_games[speed]
+    def num_games(self, perf_type):
+        return self._num_games[perf_type]
 
-    def rating(self, speed):
-        return self._ratings[speed]
+    def rating(self, perf_type):
+        return self._ratings[perf_type]
 
     def __eq__(self, other):
         return self.name == other.name
@@ -39,9 +43,13 @@ class Matchmaker:
         me = next(bot for bot in bots if bot.name == self.li.username)
         random.shuffle(bots)
 
+        variant = Variant(CONFIG["matchmaking"]["variant"])
         tc_seconds = random.choice(CONFIG["matchmaking"]["initial_times"])
         tc_increment = random.choice(CONFIG["matchmaking"]["increments"])
-        speed = Speed.from_tc(tc_seconds, tc_increment)
+        if variant == Variant.STANDARD:
+            perf_type = PerfType.from_standard_tc(tc_seconds, tc_increment)
+        else:
+            perf_type = PerfType.from_nonstandard_variant(variant)
 
         for bot in bots:
 
@@ -49,7 +57,7 @@ class Matchmaker:
                 continue
 
             if (
-                abs(bot.rating(speed) - me.rating(speed))
+                abs(bot.rating(perf_type) - me.rating(perf_type))
                 > CONFIG["matchmaking"]["max_rating_diff"]
             ):
                 continue
@@ -58,7 +66,7 @@ class Matchmaker:
                 continue
 
             logging.info(
-                f"Challenging {bot.name} to a {speed.value} game with time control of {tc_seconds} seconds."
+                f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds} seconds."
             )
 
             challenge = {
