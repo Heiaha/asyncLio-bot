@@ -1,9 +1,10 @@
 import chess
 import chess.engine
 import chess.polyglot
+import logging
 
 from config import CONFIG
-from enums import GameStatus
+from enums import GameStatus, GameEvent
 from lichess import Lichess
 
 
@@ -61,9 +62,7 @@ class Game:
     def _is_our_turn(self):
         return self.color == self.board.turn
 
-    def _make_book_move(self) -> chess.Move | None:
-        if self.board.ply() > CONFIG["book"]["depth"]:
-            return
+    def _get_book_move(self) -> chess.Move | None:
         with chess.polyglot.open_reader("komodo.bin") as reader:
             try:
                 move = reader.weighted_choice(self.board).move
@@ -74,7 +73,7 @@ class Game:
             except IndexError:
                 pass
 
-    async def _make_engine_move(self):
+    async def _get_engine_move(self):
         if len(self.board.move_stack) < 2:
             limit = chess.engine.Limit(time=10)
         else:
@@ -90,14 +89,16 @@ class Game:
             return result.move, result.info
         raise RuntimeError("Engine could not make a move.")
 
-    async def _make_move(self):
-        if move := self._make_book_move():
+    async def _get_move(self):
+        if self.board.ply() <= CONFIG["book"]["depth"] and (
+            move := self._get_book_move()
+        ):
             message = f"Book: {move.uci()}"
         else:
-            move, info = await self._make_engine_move()
+            move, info = await self._get_engine_move()
             message = f"Engine {move.uci()} {info}"
 
-        print(message)
+        logging.info(message)
         await self.li.make_move(self.id, move)
 
     def _get_result_message(self, winner: str | None) -> str:
@@ -130,39 +131,43 @@ class Game:
         return message
 
     async def play(self):
-        ping_counter = 0
-        async for event in self.li.watch_game_stream(self.id):
-            if event["type"] == "gameFull":
-                # on lichess restarts a gameFull message will be sent, even if the game is underway.
-                # check if we've already done a setup
-                if self.status is None:
-                    await self._setup(event)
-                else:
-                    self._update(event["state"])
+        try:
+            ping_counter = 0
+            async for event in self.li.watch_game_stream(self.id):
+                event_type = GameEvent(event["type"])
+                if event_type == GameEvent.GAME_FULL:
+                    # on lichess restarts a gameFull message will be sent, even if the game is underway.
+                    # check if we've already done a setup
+                    if self.status is None:
+                        await self._setup(event)
+                    else:
+                        self._update(event["state"])
 
-                if self._is_our_turn():
-                    await self._make_move()
+                    if self._is_our_turn():
+                        await self._get_move()
 
-            elif event["type"] == "gameState":
-                self._update(event)
+                elif event_type == GameEvent.GAME_STATE:
+                    self._update(event)
 
-                if self._is_game_over():
-                    print(self._get_result_message(event.get("winner")))
-                    break
+                    if self._is_game_over():
+                        logging.info(self._get_result_message(event.get("winner")))
+                        break
 
-                if self._is_our_turn():
-                    await self._make_move()
+                    if self._is_our_turn():
+                        await self._get_move()
 
-            elif event["type"] == "ping":
-                ping_counter += 1
+                elif event_type == GameEvent.PING:
+                    ping_counter += 1
 
-                if (
-                    ping_counter >= 7
-                    and len(self.board.move_stack) < 2
-                    and not self._is_our_turn()
-                ):
-                    await self.li.abort_game(self.id)
-                    break
+                    if (
+                        ping_counter >= 7
+                        and len(self.board.move_stack) < 2
+                        and not self._is_our_turn()
+                    ):
+                        await self.li.abort_game(self.id)
+                        break
 
-        print("Quitting engine.")
-        await self.engine.quit()
+            logging.info("Quitting engine.")
+            await self.engine.quit()
+        except Exception as e:
+            logging.error(e)

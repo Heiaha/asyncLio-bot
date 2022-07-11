@@ -1,9 +1,29 @@
 import json
+import logging
 
+import backoff
 import chess
 import httpx
 
+from typing import Callable
 from config import CONFIG
+
+
+def _is_final_error(e: Exception) -> bool:
+    return isinstance(e, httpx.HTTPStatusError) and e.response.status_code < 500
+
+
+# If backoff.on_exception times out, it will return the exception here.
+# Catch if it is a httpx.HTTPStatusError
+def _catch_status_code(f: Callable):
+    async def wrapper(*args, **kwargs):
+        try:
+            await f(*args, **kwargs)
+            return True
+        except httpx.HTTPStatusError:
+            return False
+
+    return wrapper
 
 
 class Lichess:
@@ -38,7 +58,7 @@ class Lichess:
                         yield event
                 return
             except Exception as e:
-                print(e)
+                logging.error(e)
 
     async def watch_game_stream(self, game_id):
         while True:
@@ -57,7 +77,7 @@ class Lichess:
                         yield event
                 return
             except Exception as e:
-                print(e)
+                logging.error(e)
 
     async def get_account(self):
         response = await self.client.get("https://lichess.org/api/account")
@@ -71,7 +91,7 @@ class Lichess:
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError as e:
-            print(e)
+            logging.error(e)
             return False
 
     async def decline_challenge(self, challenge_id: str) -> bool:
@@ -82,15 +102,15 @@ class Lichess:
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError as e:
-            print(e)
+            logging.error(e)
             return False
 
-    async def create_challenge(self, challenge: dict):
+    async def create_challenge(self, challenge: dict) -> bool:
         try:
             response = await self.client.post(
                 f"https://lichess.org/api/challenge/{challenge['opponent']}",
                 data={
-                    "rated": "true" if CONFIG["matchmaking"]["rated"] else "false",
+                    "rated": str(CONFIG["matchmaking"]["rated"]).lower(),
                     "clock.limit": challenge["tc_seconds"],
                     "clock.increment": challenge["tc_increment"],
                     "color": "random",
@@ -101,19 +121,20 @@ class Lichess:
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError as e:
-            print(e)
+            logging.error(e)
             return False
 
     async def get_online_bots(self):
         try:
             async with self.client.stream(
                 "GET", "https://lichess.org/api/bot/online"
-            ) as resp:
-                async for line in resp.aiter_lines():
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
                     bot = json.loads(line)
                     yield bot
-        except Exception as e:
-            print(e)
+        except httpx.HTTPStatusError as e:
+            logging.error(e)
 
     async def get_ongoing_games(self):
         try:
@@ -121,26 +142,24 @@ class Lichess:
             for game_info in response.json()["nowPlaying"]:
                 yield game_info
         except httpx.HTTPStatusError as e:
-            print(e)
+            logging.error(e)
 
-    async def make_move(self, game_id: str, move: chess.Move) -> bool:
-        try:
-            response = await self.client.post(
-                f"https://lichess.org/api/bot/game/{game_id}/move/{move.uci()}",
-            )
-            response.raise_for_status()
-            return True
-        except httpx.HTTPStatusError as e:
-            print(e)
-            return False
+    @_catch_status_code
+    @backoff.on_exception(
+        backoff.expo, httpx.HTTPError, max_time=300, giveup=_is_final_error
+    )
+    async def make_move(self, game_id: str, move: chess.Move):
+        response = await self.client.post(
+            f"https://lichess.org/api/bot/game/{game_id}/move/{move.uci()}",
+        )
+        response.raise_for_status()
 
-    async def abort_game(self, game_id: str) -> bool:
-        try:
-            response = await self.client.post(
-                f"https://lichess.org/api/bot/game/{game_id}/abort", timeout=10
-            )
-            response.raise_for_status()
-            return True
-        except httpx.HTTPStatusError as e:
-            print(e)
-            return False
+    @_catch_status_code
+    @backoff.on_exception(
+        backoff.expo, httpx.HTTPError, max_time=300, giveup=_is_final_error
+    )
+    async def abort_game(self, game_id: str):
+        response = await self.client.post(
+            f"https://lichess.org/api/bot/game/{game_id}/abort"
+        )
+        response.raise_for_status()

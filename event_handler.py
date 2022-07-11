@@ -1,5 +1,6 @@
 import asyncio
 
+from enums import Event
 from game_manager import GameManager
 from lichess import Lichess
 
@@ -12,17 +13,21 @@ class EventHandler:
     async def run(self):
         asyncio.create_task(self.game_manager.run())
         async for event in self.li.watch_control_stream():
-            if event["type"] == "ping":
+            event_type = Event(event["type"])
+            if event_type == Event.PING:
                 continue
 
-            elif event["type"] == "gameStart":
+            elif event_type == Event.GAME_START:
                 self.game_manager.on_game_start(event)
 
-            elif event["type"] == "gameFinish":
+            elif event_type == Event.GAME_FINISH:
                 self.game_manager.on_game_finish()
 
-            elif event["type"] == "challenge":
+            elif event_type == Event.CHALLENGE:
                 await self.game_manager.on_challenge(event)
 
-            elif event["type"] == "challengeDeclined":
+            elif event_type == Event.CHALLENGE_DECLINED:
                 continue
+
+            elif event_type == Event.CHALLENGE_CANCELED:
+                self.game_manager.on_challenge_cancelled(event)
