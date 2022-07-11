@@ -7,8 +7,8 @@ engine:
 #    Hash: 128                # Hash size (in MB).
 book:
   enabled: true
-  standard_path: "path/to/book"
-#  chess960_path: "path/to/960"
+  standard: "path/to/book"
+#  chess960: "path/to/960"
   depth: 10
 challenge:                   # Incoming challenges.
   enabled: false             # Flag for controlling if any challenges get accepted. Overrides all other flags.
