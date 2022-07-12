@@ -116,10 +116,11 @@ class Game:
             return result.move, result.info
         raise RuntimeError("Engine could not make a move.")
 
-    async def _get_move(self):
+    async def _make_move(self):
         if move := self._get_book_move():
             message = f"Book: {move.uci()}"
         else:
+            logging.info(f"Searching for move from {self.board.fen()}")
             move, info = await self._get_engine_move()
             message = self._format_engine_move_message(move, info)
 
@@ -203,7 +204,7 @@ class Game:
                         self._update(event["state"])
 
                     if self._is_our_turn():
-                        await self._get_move()
+                        await self._make_move()
 
                 elif event_type == GameEvent.GAME_STATE:
                     self._update(event)
@@ -214,7 +215,7 @@ class Game:
                         break
 
                     if self._is_our_turn():
-                        await self._get_move()
+                        await self._make_move()
 
                 elif event_type == GameEvent.PING:
                     ping_counter += 1
