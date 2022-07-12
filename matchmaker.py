@@ -1,3 +1,4 @@
+import asyncio
 import random
 import logging
 
@@ -38,6 +39,20 @@ class Matchmaker:
     def __init__(self, li: Lichess):
         self.li: Lichess = li
 
+    def _should_challenge(self, bot: Bot, me: Bot, perf_type: PerfType) -> bool:
+        if bot == me:
+            return False
+        if (
+            abs(bot.rating(perf_type) - me.rating(perf_type))
+            > CONFIG["matchmaking"]["max_rating_diff"]
+        ):
+            return False
+
+        if bot.total_games < CONFIG["matchmaking"]["min_games"]:
+            return False
+
+        return True
+
     async def challenge(self):
         bots = [Bot(info) async for info in self.li.get_online_bots()]
         me = next(bot for bot in bots if bot.name == self.li.username)
@@ -53,26 +68,22 @@ class Matchmaker:
 
         for bot in bots:
 
-            if bot == me:
-                continue
+            if self._should_challenge(bot, me, perf_type):
+                logging.info(
+                    f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds} seconds."
+                )
 
-            if (
-                abs(bot.rating(perf_type) - me.rating(perf_type))
-                > CONFIG["matchmaking"]["max_rating_diff"]
-            ):
-                continue
+                challenge = {
+                    "opponent": bot.name,
+                    "tc_seconds": tc_seconds,
+                    "tc_increment": tc_increment,
+                }
 
-            if bot.total_games < CONFIG["matchmaking"]["min_games"]:
-                continue
+                # Send challenge request.
+                challenge_id = await self.li.create_challenge(challenge)
 
-            logging.info(
-                f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds} seconds."
-            )
-
-            challenge = {
-                "opponent": bot.name,
-                "tc_seconds": tc_seconds,
-                "tc_increment": tc_increment,
-            }
-            await self.li.create_challenge(challenge)
-            return
+                # Wait 20 seconds and try to cancel the challenge in case it hasn't been responded to.
+                await asyncio.sleep(20)
+                if challenge_id:
+                    await self.li.cancel_challenge(challenge_id)
+                return

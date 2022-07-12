@@ -24,7 +24,7 @@ class GameManager:
                 )
             except asyncio.TimeoutError:
                 if self._is_under_concurrency() and CONFIG["matchmaking"]["enabled"]:
-                    await self.matchmaker.challenge()
+                    asyncio.create_task(self.matchmaker.challenge())
                 continue
 
             self.event.clear()
@@ -66,7 +66,7 @@ class GameManager:
             self.challenge_queue.remove(challenge_id)
 
     def _is_under_concurrency(self) -> bool:
-        return self.current_games < CONFIG["challenge"]["concurrency"]
+        return self.current_games < CONFIG["concurrency"]
 
     @staticmethod
     def _should_accept(event: dict) -> bool:

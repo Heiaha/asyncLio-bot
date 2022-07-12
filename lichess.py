@@ -101,9 +101,7 @@ class Lichess:
             )
             response.raise_for_status()
             return True
-        except httpx.HTTPStatusError as e:
-            logging.error(f"Could not accept challenge {challenge_id}.")
-            logging.error(e)
+        except httpx.HTTPStatusError:
             return False
 
     async def decline_challenge(self, challenge_id: str) -> bool:
@@ -114,11 +112,9 @@ class Lichess:
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError as e:
-            logging.error(f"Could not decline challenge {challenge_id}.")
-            logging.error(e)
             return False
 
-    async def create_challenge(self, challenge: dict) -> bool:
+    async def create_challenge(self, challenge: dict) -> str | None:
         try:
             response = await self.client.post(
                 f"https://lichess.org/api/challenge/{challenge['opponent']}",
@@ -132,13 +128,11 @@ class Lichess:
                 timeout=20,
             )
             response.raise_for_status()
-            return True
+            return response.json()["challenge"]["id"]
         except httpx.HTTPStatusError as e:
-            logging.error(
+            logging.warning(
                 f"Could not create challenge against {challenge['opponent']}."
             )
-            logging.error(e)
-            return False
 
     async def cancel_challenge(self, challenge_id: str) -> bool:
         try:
@@ -148,9 +142,16 @@ class Lichess:
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError as e:
-            logging.error(f"Could not cancel challenge {challenge_id}.")
-            logging.error(e)
             return False
+
+    async def get_open_challenges(self) -> dict:
+        try:
+            response = await self.client.get("https://lichess.org/api/challenge")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logging.error(f"Could not fetch open challenges.")
+            logging.error(e)
 
     async def get_online_bots(self):
         try:
@@ -202,5 +203,4 @@ class Lichess:
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError as e:
-            logging.error(e)
             return False
