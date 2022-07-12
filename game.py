@@ -126,7 +126,9 @@ class Game:
         logging.info(message)
         await self.li.make_move(self.id, move)
 
-    def _format_engine_move_message(self, move: chess.Move, info: chess.engine.InfoDict):
+    def _format_engine_move_message(
+        self, move: chess.Move, info: chess.engine.InfoDict
+    ):
         message = ""
         if self.board.turn:
             move_number = str(self.board.fullmove_number) + "."
@@ -225,6 +227,7 @@ class Game:
                         await self.li.abort_game(self.id)
                         break
 
+            logging.info("Quitting engine.")
             await self.engine.quit()
         except Exception as e:
             logging.error(e)

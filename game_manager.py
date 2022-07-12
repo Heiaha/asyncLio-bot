@@ -29,22 +29,22 @@ class GameManager:
 
             self.event.clear()
 
-            while (
-                self.current_games < CONFIG["challenge"]["concurrency"]
-                and self.challenge_queue
-            ):
+            while self._is_under_concurrency() and self.challenge_queue:
                 await self.li.accept_challenge(self.challenge_queue.popleft())
 
     def on_game_start(self, event: dict):
-        self.event.set()
-        game = Game(self.li, event["game"]["id"])
+        game_id = event["game"]["id"]
+        opponent = event["game"]["opponent"]["username"]
+        game = Game(self.li, game_id)
         asyncio.create_task(game.play())
         self.current_games += 1
+        self.event.set()
+        logging.info(f"Game {game_id} starting against {opponent}.")
         logging.info(f"Current Processes: {self.current_games}")
 
     def on_game_finish(self):
-        self.event.set()
         self.current_games -= 1
+        self.event.set()
         logging.info(f"Current Processes: {self.current_games}")
 
     async def on_challenge(self, event: dict):

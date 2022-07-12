@@ -67,6 +67,7 @@ class Lichess:
                         yield event
                 return
             except Exception as e:
+                logging.error("Error while watching event stream.")
                 logging.error(e)
 
     async def watch_game_stream(self, game_id):
@@ -86,6 +87,7 @@ class Lichess:
                         yield event
                 return
             except Exception as e:
+                logging.error("Error while watching game stream.")
                 logging.error(e)
 
     async def get_account(self):
@@ -100,6 +102,7 @@ class Lichess:
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError as e:
+            logging.error(f"Could not accept challenge {challenge_id}.")
             logging.error(e)
             return False
 
@@ -111,6 +114,7 @@ class Lichess:
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError as e:
+            logging.error(f"Could not decline challenge {challenge_id}.")
             logging.error(e)
             return False
 
@@ -130,6 +134,21 @@ class Lichess:
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError as e:
+            logging.error(
+                f"Could not create challenge against {challenge['opponent']}."
+            )
+            logging.error(e)
+            return False
+
+    async def cancel_challenge(self, challenge_id: str) -> bool:
+        try:
+            response = await self.client.post(
+                f"https://lichess.org/api/challenge/{challenge_id}/cancel"
+            )
+            response.raise_for_status()
+            return True
+        except httpx.HTTPStatusError as e:
+            logging.error(f"Could not cancel challenge {challenge_id}.")
             logging.error(e)
             return False
 
@@ -143,6 +162,7 @@ class Lichess:
                     bot = json.loads(line)
                     yield bot
         except httpx.HTTPStatusError as e:
+            logging.error("Could not fetch online bots.")
             logging.error(e)
 
     async def get_ongoing_games(self):
@@ -151,6 +171,7 @@ class Lichess:
             for game_info in response.json()["nowPlaying"]:
                 yield game_info
         except httpx.HTTPStatusError as e:
+            logging.error("Could not fetch ongoing games.")
             logging.error(e)
 
     @_catch_status_code
