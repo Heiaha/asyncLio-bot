@@ -59,15 +59,14 @@ class Lichess:
                     "GET", "https://lichess.org/api/stream/event", timeout=None
                 ) as resp:
                     async for line in resp.aiter_lines():
-                        line = line.encode("utf-8")
-                        if line == b"\n":
-                            event = {"type": "ping"}
-                        else:
+                        if line.strip():
                             event = json.loads(line)
+                        else:
+                            event = {"type": "ping"}
                         yield event
                 return
             except Exception as e:
-                logging.error("Error while watching event stream.")
+                logging.error("Error while watching control stream.")
                 logging.error(e)
 
     async def watch_game_stream(self, game_id):
@@ -79,11 +78,10 @@ class Lichess:
                     timeout=None,
                 ) as resp:
                     async for line in resp.aiter_lines():
-                        line = line.encode("utf-8")
-                        if line == b"\n":
-                            event = {"type": "ping"}
-                        else:
+                        if line.strip():
                             event = json.loads(line)
+                        else:
+                            event = {"type": "ping"}
                         yield event
                 return
             except Exception as e:
@@ -111,7 +109,7 @@ class Lichess:
             )
             response.raise_for_status()
             return True
-        except httpx.HTTPStatusError as e:
+        except httpx.HTTPStatusError:
             return False
 
     async def create_challenge(self, challenge: dict) -> str | None:
@@ -129,7 +127,7 @@ class Lichess:
             )
             response.raise_for_status()
             return response.json()["challenge"]["id"]
-        except httpx.HTTPStatusError as e:
+        except httpx.HTTPStatusError:
             logging.warning(
                 f"Could not create challenge against {challenge['opponent']}."
             )
@@ -141,7 +139,7 @@ class Lichess:
             )
             response.raise_for_status()
             return True
-        except httpx.HTTPStatusError as e:
+        except httpx.HTTPStatusError:
             return False
 
     async def get_open_challenges(self) -> dict:
@@ -202,5 +200,5 @@ class Lichess:
             )
             response.raise_for_status()
             return True
-        except httpx.HTTPStatusError as e:
+        except httpx.HTTPStatusError:
             return False
