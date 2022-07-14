@@ -72,7 +72,7 @@ class Game:
 
         return board
 
-    def _is_our_turn(self):
+    def _is_our_turn(self) -> bool:
         return self.color == self.board.turn
 
     def _get_book_move(self) -> chess.Move | None:
@@ -99,7 +99,7 @@ class Game:
             except IndexError:
                 pass
 
-    async def _get_engine_move(self):
+    async def _get_engine_move(self) -> tuple[chess.Move, chess.engine.InfoDict]:
         if len(self.board.move_stack) < 2:
             limit = chess.engine.Limit(time=10)
         else:
@@ -128,7 +128,7 @@ class Game:
 
     def _format_engine_move_message(
         self, move: chess.Move, info: chess.engine.InfoDict
-    ):
+    ) -> str:
         message = ""
         if self.board.turn:
             move_number = str(self.board.fullmove_number) + "."
@@ -189,7 +189,7 @@ class Game:
             message = "Game aborted."
         return message
 
-    def is_game_over(self):
+    def is_game_over(self) -> bool:
         return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
 
     async def play(self):

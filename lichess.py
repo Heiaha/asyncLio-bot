@@ -5,11 +5,11 @@ import backoff
 import chess
 import httpx
 
-from typing import Callable
+from typing import Callable, AsyncGenerator
 from config import CONFIG
 
 
-def _is_final_error(e: httpx.HTTPError) -> bool:
+def _is_final_error(e: Exception) -> bool:
     return isinstance(e, httpx.HTTPStatusError) and e.response.status_code < 500
 
 
@@ -54,7 +54,7 @@ class Lichess:
     def title(self):
         return self.user.get("title")
 
-    async def watch_control_stream(self):
+    async def watch_control_stream(self) -> AsyncGenerator[dict, dict]:
         while True:
             try:
                 async with self.client.stream(
@@ -71,7 +71,7 @@ class Lichess:
                 logging.error("Error while watching control stream.")
                 logging.error(e)
 
-    async def watch_game_stream(self, game_id):
+    async def watch_game_stream(self, game_id) -> AsyncGenerator[dict, dict]:
         while True:
             try:
                 async with self.client.stream(
@@ -93,7 +93,7 @@ class Lichess:
                 logging.error(e)
 
     async def get_account(self):
-        response = await self.client.get("https://lichess.org/api/account")
+        response = await self.client.get("/api/account")
         return response.json()
 
     async def accept_challenge(self, challenge_id: str) -> bool:
@@ -140,7 +140,7 @@ class Lichess:
         except httpx.HTTPStatusError:
             return False
 
-    async def abort_game(self, game_id: str):
+    async def abort_game(self, game_id: str) -> bool:
         try:
             response = await self.client.post(f"/api/bot/game/{game_id}/abort")
             response.raise_for_status()
@@ -157,7 +157,7 @@ class Lichess:
             logging.error(f"Could not fetch open challenges.")
             logging.error(e)
 
-    async def get_online_bots(self):
+    async def get_online_bots(self) -> AsyncGenerator[dict, dict]:
         try:
             async with self.client.stream("GET", "/api/bot/online") as response:
                 response.raise_for_status()
