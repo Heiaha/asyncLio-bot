@@ -1,4 +1,5 @@
 import asyncio
+from typing import NoReturn
 
 from enums import Event
 from game_manager import GameManager
@@ -6,11 +7,11 @@ from lichess import Lichess
 
 
 class EventHandler:
-    def __init__(self, li: Lichess):
+    def __init__(self, li: Lichess) -> None:
         self.li: Lichess = li
         self.game_manager: GameManager = GameManager(li)
 
-    async def run(self):
+    async def run(self) -> NoReturn:
         asyncio.create_task(self.game_manager.run())
         async for event in self.li.watch_control_stream():
             event_type = Event(event["type"])

@@ -12,7 +12,7 @@ from lichess import Lichess
 
 
 class Game:
-    def __init__(self, li: Lichess, game_id: str):
+    def __init__(self, li: Lichess, game_id: str) -> None:
         self.li: Lichess = li
         self.id: str = game_id
         self.status: GameStatus = GameStatus.CREATED
@@ -29,7 +29,7 @@ class Game:
         self.variant: Variant | None = None
         self.engine: chess.engine.UciProtocol | None = None
 
-    async def _setup(self, event):
+    async def _setup(self, event: dict) -> None:
         if (fen := event["initialFen"]) != "startpos":
             self.initial_fen = fen
         else:
@@ -52,7 +52,7 @@ class Game:
         self.engine = engine
         self.start_time = time.monotonic()
 
-    def _update(self, event: dict):
+    def _update(self, event: dict) -> None:
 
         self.board = self._setup_board(event)
         self.white_time = event["wtime"]
@@ -116,7 +116,7 @@ class Game:
             return result.move, result.info
         raise RuntimeError("Engine could not make a move.")
 
-    async def _make_move(self):
+    async def _make_move(self) -> None:
         if move := self._get_book_move():
             message = f"{self.id} -- Book: {self.board.san(move)}"
         else:

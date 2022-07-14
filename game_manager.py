@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from collections import deque
+from typing import NoReturn
 
 from config import CONFIG
 from game import Game
@@ -9,14 +10,14 @@ from matchmaker import Matchmaker
 
 
 class GameManager:
-    def __init__(self, li: Lichess):
+    def __init__(self, li: Lichess) -> None:
         self.li: Lichess = li
         self.matchmaker: Matchmaker = Matchmaker(self.li)
         self.current_games: dict[str, (Game, asyncio.Task)] = {}
         self.challenge_queue: deque[str] = deque()
         self.event: asyncio.Event = asyncio.Event()
 
-    async def run(self):
+    async def run(self) -> NoReturn:
         while True:
             try:
                 await asyncio.wait_for(
@@ -35,7 +36,7 @@ class GameManager:
             while self._is_under_concurrency_limit() and self.challenge_queue:
                 await self.li.accept_challenge(self.challenge_queue.popleft())
 
-    async def on_game_start(self, event: dict):
+    async def on_game_start(self, event: dict) -> None:
         game_id = event["game"]["id"]
         opponent = event["game"]["opponent"]["username"]
 
@@ -53,7 +54,7 @@ class GameManager:
         logging.info(f"Game {game_id} starting against {opponent}.")
         logging.info(f"Current Processes: {len(self.current_games)}")
 
-    async def on_game_finish(self, event: dict):
+    async def on_game_finish(self, event: dict) -> None:
         if (game_id := event["game"]["id"]) in self.current_games:
             game, task = self.current_games.pop(game_id)
 
@@ -66,7 +67,7 @@ class GameManager:
         self.event.set()
         logging.info(f"Current Processes: {len(self.current_games)}")
 
-    async def on_challenge(self, event: dict):
+    async def on_challenge(self, event: dict) -> None:
         challenge_id = event["challenge"]["id"]
         challenger_name = event["challenge"]["challenger"]["name"]
         if challenger_name == self.li.username:
@@ -79,7 +80,7 @@ class GameManager:
         else:
             await self.li.decline_challenge(challenge_id)
 
-    def on_challenge_cancelled(self, event: dict):
+    def on_challenge_cancelled(self, event: dict) -> None:
         challenge_id = event["challenge"]["id"]
         if challenge_id in self.challenge_queue:
             self.challenge_queue.remove(challenge_id)
@@ -120,7 +121,7 @@ class GameManager:
 
         return True
 
-    def clean_games(self):
+    def clean_games(self) -> None:
         # Sometimes the lichess game loop seems to close without the event loop sending a "gameFinish" event
         # but still having closed the game stream. This function will take case of those cases.
         self.current_games = {

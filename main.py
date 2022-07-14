@@ -1,6 +1,8 @@
+import argparse
 import asyncio
 import logging
 from argparse import ArgumentParser
+from typing import NoReturn
 
 import chess.engine
 
@@ -18,7 +20,7 @@ LOGO = """
                                          """
 
 
-async def main(args):
+async def main(args: argparse.Namespace) -> NoReturn:
     logging_handlers = [logging.StreamHandler()]
     if args.log:
         logging_handlers.append(logging.FileHandler(args.log))
@@ -57,7 +59,6 @@ if __name__ == "__main__":
         "--upgrade", "-u", action="store_true", help="Upgrade account to BOT account."
     )
     parser.add_argument("--log", "-l", type=str, help="Log file.")
-    args = parser.parse_args()
 
     asyncio.set_event_loop_policy(chess.engine.EventLoopPolicy())
-    asyncio.run(main(args))
+    asyncio.run(main(parser.parse_args()))

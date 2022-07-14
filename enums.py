@@ -61,7 +61,7 @@ class PerfType(Enum):
     THREE_CHECK = "threeCheck"
 
     @classmethod
-    def from_standard_tc(cls, tc_seconds: int, tc_increment: int = 0):
+    def from_standard_tc(cls, tc_seconds: int, tc_increment: int = 0) -> "PerfType":
         duration = tc_seconds + 40 * tc_increment
         if duration < 179:
             return cls.BULLET
@@ -75,7 +75,7 @@ class PerfType(Enum):
         return cls.CLASSICAL
 
     @classmethod
-    def from_nonstandard_variant(cls, variant: Variant):
+    def from_nonstandard_variant(cls, variant: Variant) -> "PerfType":
         if variant == Variant.FROM_POSITION:
             raise ValueError("'From Position' not supported as a performance type.")
         return cls(variant.value)

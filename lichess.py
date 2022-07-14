@@ -1,5 +1,5 @@
 import json
-from typing import AsyncGenerator
+from typing import AsyncIterator
 
 import backoff
 import chess
@@ -9,7 +9,7 @@ from config import CONFIG
 
 
 class Lichess:
-    def __init__(self):
+    def __init__(self) -> None:
         self.token = CONFIG["token"]
         self.headers = {
             "Authorization": f"Bearer {self.token}",
@@ -22,18 +22,18 @@ class Lichess:
         self.user: dict | None = None
 
     @classmethod
-    async def create(cls):
+    async def create(cls) -> "Lichess":
         li = cls()
         li.user = await li.get_account()
         return li
 
     @property
-    def username(self):
+    def username(self) -> str:
         return self.user["username"]
 
     @property
-    def title(self):
-        return self.user.get("title")
+    def title(self) -> str:
+        return self.user.get("title", "")
 
     @backoff.on_exception(backoff.expo, httpx.HTTPStatusError)
     async def get(self, endpoint: str, **kwargs) -> httpx.Response:
@@ -51,7 +51,7 @@ class Lichess:
         else:
             response.raise_for_status()
 
-    async def watch_control_stream(self) -> AsyncGenerator[dict, dict]:
+    async def watch_control_stream(self) -> AsyncIterator[dict]:
         while True:
             try:
                 async with self.client.stream(
@@ -68,7 +68,7 @@ class Lichess:
             except httpx.HTTPStatusError:
                 pass
 
-    async def watch_game_stream(self, game_id) -> AsyncGenerator[dict, dict]:
+    async def watch_game_stream(self, game_id: str) -> AsyncIterator[dict]:
         while True:
             try:
                 async with self.client.stream(
@@ -88,7 +88,7 @@ class Lichess:
                 if game_id not in await self.get_ongoing_games():
                     return
 
-    async def get_online_bots(self) -> AsyncGenerator[dict, dict]:
+    async def get_online_bots(self) -> AsyncIterator[dict]:
         try:
             async with self.client.stream("GET", "/api/bot/online") as response:
                 response.raise_for_status()

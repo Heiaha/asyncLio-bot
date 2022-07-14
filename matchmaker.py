@@ -1,5 +1,6 @@
 import logging
 import random
+from typing import Any
 
 from config import CONFIG
 from enums import PerfType, Variant
@@ -7,7 +8,7 @@ from lichess import Lichess
 
 
 class Bot:
-    def __init__(self, info):
+    def __init__(self, info) -> None:
         self.name = info["username"]
 
         self._ratings = {}
@@ -21,21 +22,23 @@ class Bot:
             )
 
     @property
-    def total_games(self):
+    def total_games(self) -> int:
         return sum(self._num_games.values())
 
-    def num_games(self, perf_type):
+    def num_games(self, perf_type) -> int:
         return self._num_games[perf_type]
 
-    def rating(self, perf_type):
+    def rating(self, perf_type) -> int:
         return self._ratings[perf_type]
 
-    def __eq__(self, other):
-        return self.name == other.name
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, Bot):
+            return self.name == other.name
+        return NotImplemented
 
 
 class Matchmaker:
-    def __init__(self, li: Lichess):
+    def __init__(self, li: Lichess) -> None:
         self.li: Lichess = li
 
     @staticmethod
@@ -53,7 +56,7 @@ class Matchmaker:
 
         return True
 
-    async def challenge(self):
+    async def challenge(self) -> None:
         bots = [
             Bot(info)
             async for info in self.li.get_online_bots()
