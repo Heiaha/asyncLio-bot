@@ -193,54 +193,51 @@ class Game:
         return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
 
     async def play(self):
-        try:
-            abort_count = 0
-            async for event in self.li.watch_game_stream(self.id):
-                event_type = GameEvent(event["type"])
-                if event_type == GameEvent.GAME_FULL:
-                    # on lichess restarts a gameFull message will be sent, even if the game is underway.
-                    # check if we've already done a setup
-                    if self.status == GameStatus.CREATED:
-                        await self._setup(event)
-                    else:
-                        self._update(event["state"])
+        abort_count = 0
+        async for event in self.li.watch_game_stream(self.id):
+            event_type = GameEvent(event["type"])
+            if event_type == GameEvent.GAME_FULL:
+                # on lichess restarts a gameFull message will be sent, even if the game is underway.
+                # check if we've already done a setup
+                if self.status == GameStatus.CREATED:
+                    await self._setup(event)
+                else:
+                    self._update(event["state"])
 
-                    if self._is_our_turn():
-                        await self._make_move()
+                if self._is_our_turn():
+                    await self._make_move()
 
-                elif event_type == GameEvent.GAME_STATE:
-                    self._update(event)
+            elif event_type == GameEvent.GAME_STATE:
+                self._update(event)
 
-                    if self.is_game_over():
-                        message = self._format_result_message(event.get("winner"))
-                        logging.info(message)
+                if self.is_game_over():
+                    message = self._format_result_message(event.get("winner"))
+                    logging.info(message)
+                    break
+
+                if self._is_our_turn():
+                    await self._make_move()
+
+            elif event_type == GameEvent.PING:
+                if (
+                    len(self.board.move_stack) < 2
+                    and not self._is_our_turn()
+                    and time.monotonic() > self.start_time + CONFIG["abort_time"]
+                ):
+                    await self.li.abort_game(self.id)
+                    abort_count += 1
+
+                    # If we've tried to abort the game three times and still haven't gotten back
+                    # a game event about the abort, just break out of the loop.
+                    if abort_count >= 3:
+                        self.status = GameStatus.ABORTED
                         break
 
-                    if self._is_our_turn():
-                        await self._make_move()
+        # It's possible we've reached this stage because the server has 502'd
+        # and the iterator has unexpectedly closed without setting the status to be in a finished state.
+        # If that's true we need to set the game to be over, so that it can be cleaned up by the game manager.
+        if not self.is_game_over():
+            self.status = GameStatus.UNKNOWN_FINISH
 
-                elif event_type == GameEvent.PING:
-                    if (
-                        len(self.board.move_stack) < 2
-                        and not self._is_our_turn()
-                        and time.monotonic() > self.start_time + CONFIG["abort_time"]
-                    ):
-                        await self.li.abort_game(self.id)
-                        abort_count += 1
-
-                        # If we've tried to abort the game three times and still haven't gotten back
-                        # a game event about the abort, just break out of the loop.
-                        if abort_count >= 3:
-                            self.status = GameStatus.ABORTED
-                            break
-
-            # It's possible we've reached this stage because the server has 502'd
-            # and the iterator has unexpectedly closed without setting the status to be in a finished state.
-            # If that's true we need to set the game to be over, so that it can be cleaned up by the game manager.
-            if not self.is_game_over():
-                self.status = GameStatus.UNKNOWN_FINISH
-
-            logging.info("Quitting engine.")
-            await self.engine.quit()
-        except Exception as e:
-            logging.error(e)
+        logging.info("Quitting engine.")
+        await self.engine.quit()
