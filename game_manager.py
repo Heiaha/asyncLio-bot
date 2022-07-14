@@ -12,14 +12,12 @@ class GameManager:
     def __init__(self, li: Lichess):
         self.li: Lichess = li
         self.matchmaker: Matchmaker = Matchmaker(self.li)
-        self.current_games: dict[str, Game] = {}
+        self.current_games: dict[str, (Game, asyncio.Task)] = {}
         self.challenge_queue: deque[str] = deque()
         self.event: asyncio.Event = asyncio.Event()
 
     async def run(self):
         while True:
-            self._clean_games()
-
             try:
                 await asyncio.wait_for(
                     self.event.wait(), timeout=CONFIG["matchmaking"]["timeout"]
@@ -48,15 +46,17 @@ class GameManager:
             return
 
         game = Game(self.li, game_id)
-        self.current_games[game_id] = game
-        asyncio.create_task(game.play())
+        task = asyncio.create_task(game.play())
+
+        self.current_games[game_id] = game, task
         self.event.set()
         logging.info(f"Game {game_id} starting against {opponent}.")
         logging.info(f"Current Processes: {len(self.current_games)}")
 
-    def on_game_finish(self, event: dict):
+    async def on_game_finish(self, event: dict):
         if (game_id := event["game"]["id"]) in self.current_games:
-            self.current_games.pop(game_id)
+            game, task = self.current_games.pop(game_id)
+            await task
         self.event.set()
         logging.info(f"Current Processes: {len(self.current_games)}")
 
@@ -114,9 +114,11 @@ class GameManager:
 
         return True
 
-    def _clean_games(self):
+    def clean_games(self):
+        # Sometimes the lichess game loop seems to close without the event loop sending a "gameFinish" event
+        # but still having closed the game stream. This function will take case of those cases.
         self.current_games = {
-            game_id: game
-            for game_id, game in self.current_games.items()
+            game_id: (game, task)
+            for game_id, (game, task) in self.current_games.items()
             if not game.is_game_over()
         }

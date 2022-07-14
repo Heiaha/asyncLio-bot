@@ -34,7 +34,9 @@ class Lichess:
             "Authorization": f"Bearer {self.token}",
         }
 
-        self.client = httpx.AsyncClient(headers=self.headers)
+        self.client = httpx.AsyncClient(
+            base_url="https://lichess.org", headers=self.headers
+        )
 
         self.user: dict | None = None
 
@@ -56,7 +58,7 @@ class Lichess:
         while True:
             try:
                 async with self.client.stream(
-                    "GET", "https://lichess.org/api/stream/event", timeout=None
+                    "GET", "/api/stream/event", timeout=None
                 ) as resp:
                     async for line in resp.aiter_lines():
                         if line.strip():
@@ -74,7 +76,7 @@ class Lichess:
             try:
                 async with self.client.stream(
                     "GET",
-                    f"https://lichess.org/api/bot/game/stream/{game_id}",
+                    f"/api/bot/game/stream/{game_id}",
                     timeout=None,
                 ) as resp:
                     async for line in resp.aiter_lines():
@@ -96,9 +98,7 @@ class Lichess:
 
     async def accept_challenge(self, challenge_id: str) -> bool:
         try:
-            response = await self.client.post(
-                f"https://lichess.org/api/challenge/{challenge_id}/accept"
-            )
+            response = await self.client.post(f"/api/challenge/{challenge_id}/accept")
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError:
@@ -106,20 +106,18 @@ class Lichess:
 
     async def decline_challenge(self, challenge_id: str) -> bool:
         try:
-            response = await self.client.post(
-                f"https://lichess.org/api/challenge/{challenge_id}/decline"
-            )
+            response = await self.client.post(f"/api/challenge/{challenge_id}/decline")
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError:
             return False
 
     async def create_challenge(
-        self, opponent: str, initial_time: int, increment: int
+        self, opponent: str, initial_time: int, increment: int = 0
     ) -> str | None:
         try:
             response = await self.client.post(
-                f"https://lichess.org/api/challenge/{opponent}",
+                f"/api/challenge/{opponent}",
                 data={
                     "rated": str(CONFIG["matchmaking"]["rated"]).lower(),
                     "clock.limit": initial_time,
@@ -136,9 +134,7 @@ class Lichess:
 
     async def cancel_challenge(self, challenge_id: str) -> bool:
         try:
-            response = await self.client.post(
-                f"https://lichess.org/api/challenge/{challenge_id}/cancel"
-            )
+            response = await self.client.post(f"/api/challenge/{challenge_id}/cancel")
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError:
@@ -146,9 +142,7 @@ class Lichess:
 
     async def abort_game(self, game_id: str):
         try:
-            response = await self.client.post(
-                f"https://lichess.org/api/bot/game/{game_id}/abort"
-            )
+            response = await self.client.post(f"/api/bot/game/{game_id}/abort")
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError:
@@ -156,7 +150,7 @@ class Lichess:
 
     async def get_open_challenges(self) -> dict:
         try:
-            response = await self.client.get("https://lichess.org/api/challenge")
+            response = await self.client.get("/api/challenge")
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
@@ -165,9 +159,7 @@ class Lichess:
 
     async def get_online_bots(self):
         try:
-            async with self.client.stream(
-                "GET", "https://lichess.org/api/bot/online"
-            ) as response:
+            async with self.client.stream("GET", "/api/bot/online") as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     bot = json.loads(line)
@@ -192,15 +184,13 @@ class Lichess:
     )
     async def make_move(self, game_id: str, move: chess.Move):
         response = await self.client.post(
-            f"https://lichess.org/api/bot/game/{game_id}/move/{move.uci()}",
+            f"/api/bot/game/{game_id}/move/{move.uci()}",
         )
         response.raise_for_status()
 
     async def upgrade_account(self) -> bool:
         try:
-            response = await self.client.post(
-                "https://lichess.org/api/bot/account/upgrade"
-            )
+            response = await self.client.post("/api/bot/account/upgrade")
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError:

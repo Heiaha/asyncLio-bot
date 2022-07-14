@@ -1,3 +1,4 @@
+import time
 import chess
 import chess.engine
 import chess.polyglot
@@ -48,6 +49,7 @@ class Game:
         if options := CONFIG["engine"].get("uci_options"):
             await engine.configure(options)
         self.engine = engine
+        self.start_time = time.time()
 
     def _update(self, event: dict):
 
@@ -69,9 +71,6 @@ class Game:
             board.push_uci(move_str)
 
         return board
-
-    def is_game_over(self):
-        return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
 
     def _is_our_turn(self):
         return self.color == self.board.turn
@@ -151,8 +150,8 @@ class Game:
                     score_str = f"+{cp_score}" if cp_score > 0 else f"{cp_score}"
                     message += f"CP Score: {score_str:<10}"
 
-        if time := info.get("time", 0.0):
-            message += f"Time: {time:<10.1f}"
+        if think_time := info.get("time", 0.0):
+            message += f"Time: {think_time:<10.1f}"
 
         if depth := info.get("depth", 1):
             message += f"Depth: {depth:<10}"
@@ -190,9 +189,12 @@ class Game:
             message = "Game aborted."
         return message
 
+    def is_game_over(self):
+        return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
+
     async def play(self):
         try:
-            ping_counter = 0
+            abort_count = 0
             async for event in self.li.watch_game_stream(self.id):
                 event_type = GameEvent(event["type"])
                 if event_type == GameEvent.GAME_FULL:
@@ -218,19 +220,23 @@ class Game:
                         await self._make_move()
 
                 elif event_type == GameEvent.PING:
-                    ping_counter += 1
-
                     if (
-                        ping_counter >= 7
-                        and len(self.board.move_stack) < 2
+                        len(self.board.move_stack) < 2
                         and not self._is_our_turn()
+                        and time.time() > self.start_time + CONFIG["abort_time"]
                     ):
                         await self.li.abort_game(self.id)
-                        break
+                        abort_count += 1
+
+                        # If we've tried to abort the game three times and still haven't gotten back
+                        # a game event about the abort, just break out of the loop.
+                        if abort_count >= 3:
+                            self.status = GameStatus.ABORTED
+                            break
 
             # It's possible we've reached this stage because the server has 502'd
-            # and the iterator has unexpectedly closed without setting the status to be finished.
-            # If that's true we need to set the game to be over, so that it can be cleaned up by the game manager loop.
+            # and the iterator has unexpectedly closed without setting the status to be in a finished state.
+            # If that's true we need to set the game to be over, so that it can be cleaned up by the game manager.
             if not self.is_game_over():
                 self.status = GameStatus.UNKNOWN_FINISH
 

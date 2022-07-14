@@ -1,8 +1,9 @@
 token: "XXXXXXXXXXXXXXX"
+concurrency: 1                # Number of games to play simultaneously.
+abort_time: 20                # Amount of time to abort game start after no activity.
 engine:
   path: "/path/to/engine"
   uci_options:               # Arbitrary UCI options passed to the engine. Can be commented out or changed.
-#    Overhead: 10             # Increase if your bot flags games too often.
 #    Threads: 1               # Max CPU threads the engine can use.
 #    Hash: 128                # Hash size (in MB).
 book:
@@ -12,7 +13,6 @@ book:
   depth: 10
 challenge:                   # Incoming challenges.
   enabled: false             # Flag for controlling if any challenges get accepted. Overrides all other flags.
-  concurrency: 1             # Number of games to play simultaneously.
   max_increment: 60          # Maximum amount of increment to accept a challenge. The max is 180. Set to 0 for no increment.
   min_increment: 0           # Minimum amount of increment to accept a challenge.
   max_base: 3600             # Maximum amount of base time to accept a challenge. The max is 315360000 (10 years).
