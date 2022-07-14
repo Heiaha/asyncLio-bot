@@ -1,4 +1,4 @@
-httpx~=0.23.0
-chess~=1.9.2
-pyaml~=21.10.1
-backoff~=2.1.2
+httpx ~= 0.23.0
+chess ~= 1.9.2
+PyYAML ~= 6.0
+backoff ~= 2.1.2
