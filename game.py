@@ -1,9 +1,10 @@
+import logging
 import time
+
 import chess
 import chess.engine
 import chess.polyglot
 import chess.variant
-import logging
 
 from config import CONFIG
 from enums import GameStatus, GameEvent, Variant

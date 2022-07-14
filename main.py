@@ -1,10 +1,11 @@
 import asyncio
 import logging
-import chess.engine
 from argparse import ArgumentParser
+
+import chess.engine
+
 from event_handler import EventHandler
 from lichess import Lichess
-
 
 LOGO = """
   _    _                               _ 

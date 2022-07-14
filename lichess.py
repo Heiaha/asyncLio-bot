@@ -1,11 +1,10 @@
 import json
-import logging
+from typing import AsyncGenerator
 
 import backoff
 import chess
 import httpx
 
-from typing import Callable, AsyncGenerator
 from config import CONFIG
 
 

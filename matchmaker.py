@@ -1,10 +1,9 @@
-import asyncio
-import random
 import logging
+import random
 
 from config import CONFIG
-from lichess import Lichess
 from enums import PerfType, Variant
+from lichess import Lichess
 
 
 class Bot:
