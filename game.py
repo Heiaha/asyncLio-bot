@@ -12,40 +12,27 @@ from lichess import Lichess
 
 
 class Game:
-    def __init__(self, li: Lichess, game_id: str) -> None:
+    def __init__(self, li: Lichess, event: dict) -> None:
+        logging.info(event)
         self.li: Lichess = li
-        self.id: str = game_id
+        self.id: str = event["game"]["gameId"]
+        self.color: chess.Color = (
+            chess.WHITE if event["game"]["color"] == "white" else chess.BLACK
+        )
+        self.opponent: str = event["game"]["opponent"]["username"]
+        self.initial_fen: str = event["game"]["fen"]
+        self.variant: Variant = Variant(event["game"]["variant"]["key"])
         self.status: GameStatus = GameStatus.CREATED
-        self.board: chess.Board = chess.Board()
+        self.board: chess.Board = self._setup_board()
 
-        # attributes to be set up asynchronously when the game starts
-        self.color: chess.Color | None = None
-        self.initial_fen: str | None = None
+        # attributes to be set up asynchronously or after the game starts
         self.white_time: int | None = None
         self.black_time: int | None = None
-        self.increment: int | None = None
-        self.white_name: str | None = None
-        self.black_name: str | None = None
-        self.variant: Variant | None = None
+        self.white_inc: int | None = None
+        self.black_inc: int | None = None
         self.engine: chess.engine.UciProtocol | None = None
 
-    async def _setup(self, event: dict) -> None:
-        if (fen := event["initialFen"]) != "startpos":
-            self.initial_fen = fen
-        else:
-            self.initial_fen = chess.STARTING_FEN
-
-        self.white_time = event["state"]["wtime"]
-        self.black_time = event["state"]["btime"]
-        self.increment = event["clock"]["increment"]
-        self.white_name = event["white"].get("name", "AI")
-        self.black_name = event["black"].get("name", "AI")
-        self.status = GameStatus(event["state"]["status"])
-        self.variant = Variant(event["variant"]["key"])
-        self.color = chess.WHITE if self.white_name == self.li.username else chess.BLACK
-
-        self.board = self._setup_board(event["state"])
-
+    async def _setup(self) -> None:
         transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
         if options := CONFIG["engine"].get("uci_options"):
             await engine.configure(options)
@@ -53,13 +40,14 @@ class Game:
         self.start_time = time.monotonic()
 
     def _update(self, event: dict) -> None:
-
+        self.status = GameStatus(event["status"])
         self.board = self._setup_board(event)
         self.white_time = event["wtime"]
         self.black_time = event["btime"]
-        self.status = GameStatus(event["status"])
+        self.white_inc = event["winc"]
+        self.black_inc = event["binc"]
 
-    def _setup_board(self, event: dict) -> chess.Board:
+    def _setup_board(self, event: dict | None = None) -> chess.Board:
         if self.variant == Variant.CHESS960:
             board = chess.Board(self.initial_fen, chess960=True)
         elif self.variant == Variant.FROM_POSITION:
@@ -67,10 +55,10 @@ class Game:
         else:
             board = chess.variant.find_variant(self.variant.value)()
 
-        move_strs = event["moves"].split()
-        for move_str in move_strs:
-            board.push_uci(move_str)
-
+        if event:
+            move_strs = event["moves"].split()
+            for move_str in move_strs:
+                board.push_uci(move_str)
         return board
 
     def _is_our_turn(self) -> bool:
@@ -107,8 +95,8 @@ class Game:
             limit = chess.engine.Limit(
                 white_clock=self.white_time / 1000,
                 black_clock=self.black_time / 1000,
-                white_inc=self.increment / 1000,
-                black_inc=self.increment / 1000,
+                white_inc=self.white_inc / 1000,
+                black_inc=self.black_inc / 1000,
             )
 
         result = await self.engine.play(self.board, limit, info=chess.engine.INFO_ALL)
@@ -164,11 +152,19 @@ class Game:
 
         return message
 
-    def _format_result_message(self, winner: str | None) -> str:
-        winning_name = self.white_name if winner == "white" else self.black_name
-        losing_name = self.white_name if winner == "black" else self.black_name
+    def _format_result_message(self, winner_str: str | None) -> str:
 
-        if winner:
+        if winner_str == "white":
+            winner = chess.WHITE
+        elif winner_str == "black":
+            winner = chess.BLACK
+        else:
+            winner = None
+
+        winning_name = self.li.username if winner == self.color else self.opponent
+        losing_name = self.opponent if winner == self.color else self.li.username
+
+        if winner is not None:
             message = f"{winning_name} won"
 
             if self.status == GameStatus.MATE:
@@ -197,16 +193,11 @@ class Game:
 
     async def play(self):
         abort_count = 0
+        await self._setup()
         async for event in self.li.watch_game_stream(self.id):
             event_type = GameEvent(event["type"])
             if event_type == GameEvent.GAME_FULL:
-                # on lichess restarts a gameFull message will be sent, even if the game is underway.
-                # check if we've already done a setup
-                if self.status == GameStatus.CREATED:
-                    await self._setup(event)
-                else:
-                    self._update(event["state"])
-
+                self._update(event["state"])
                 if self._is_our_turn():
                     await self._make_move()
 

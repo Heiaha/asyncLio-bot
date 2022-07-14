@@ -46,7 +46,7 @@ class GameManager:
             await self.li.abort_game(game_id)
             return
 
-        game = Game(self.li, game_id)
+        game = Game(self.li, event)
         task = asyncio.create_task(game.play())
         self.current_games[game_id] = game, task
 
