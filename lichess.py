@@ -9,24 +9,6 @@ from typing import Callable, AsyncGenerator
 from config import CONFIG
 
 
-def _is_final_error(e: Exception) -> bool:
-    return isinstance(e, httpx.HTTPStatusError) and e.response.status_code < 500
-
-
-# If backoff.on_exception times out or gives up,
-# it will return the exception here in this decorator.
-# Catch if it is a httpx.HTTPStatusError
-def _catch_status_code(f: Callable):
-    async def wrapper(*args, **kwargs):
-        try:
-            await f(*args, **kwargs)
-            return True
-        except httpx.HTTPStatusError:
-            return False
-
-    return wrapper
-
-
 class Lichess:
     def __init__(self):
         self.token = CONFIG["token"]
@@ -54,22 +36,38 @@ class Lichess:
     def title(self):
         return self.user.get("title")
 
+    @backoff.on_exception(backoff.expo, httpx.HTTPStatusError)
+    async def get(self, endpoint: str, **kwargs) -> httpx.Response:
+        response = await self.client.get(endpoint, **kwargs)
+        if response.status_code < 500:
+            return response
+        else:
+            response.raise_for_status()
+
+    @backoff.on_exception(backoff.expo, httpx.HTTPStatusError, max_time=300)
+    async def post(self, endpoint: str, **kwargs) -> httpx.Response:
+        response = await self.client.post(endpoint, **kwargs)
+        if response.status_code < 500:
+            return response
+        else:
+            response.raise_for_status()
+
     async def watch_control_stream(self) -> AsyncGenerator[dict, dict]:
         while True:
             try:
                 async with self.client.stream(
                     "GET", "/api/stream/event", timeout=None
-                ) as resp:
-                    async for line in resp.aiter_lines():
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
                         if line.strip():
                             event = json.loads(line)
                         else:
                             event = {"type": "ping"}
                         yield event
                 return
-            except Exception as e:
-                logging.error("Error while watching control stream.")
-                logging.error(e)
+            except httpx.HTTPStatusError:
+                pass
 
     async def watch_game_stream(self, game_id) -> AsyncGenerator[dict, dict]:
         while True:
@@ -78,84 +76,18 @@ class Lichess:
                     "GET",
                     f"/api/bot/game/stream/{game_id}",
                     timeout=None,
-                ) as resp:
-                    async for line in resp.aiter_lines():
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
                         if line.strip():
                             event = json.loads(line)
                         else:
                             event = {"type": "ping"}
                         yield event
                 return
-            except Exception as e:
+            except httpx.HTTPStatusError:
                 if game_id not in await self.get_ongoing_games():
                     return
-                logging.error("Error while watching game stream.")
-                logging.error(e)
-
-    async def get_account(self):
-        response = await self.client.get("/api/account")
-        return response.json()
-
-    async def accept_challenge(self, challenge_id: str) -> bool:
-        try:
-            response = await self.client.post(f"/api/challenge/{challenge_id}/accept")
-            response.raise_for_status()
-            return True
-        except httpx.HTTPStatusError:
-            return False
-
-    async def decline_challenge(self, challenge_id: str) -> bool:
-        try:
-            response = await self.client.post(f"/api/challenge/{challenge_id}/decline")
-            response.raise_for_status()
-            return True
-        except httpx.HTTPStatusError:
-            return False
-
-    async def create_challenge(
-        self, opponent: str, initial_time: int, increment: int = 0
-    ) -> str | None:
-        try:
-            response = await self.client.post(
-                f"/api/challenge/{opponent}",
-                data={
-                    "rated": str(CONFIG["matchmaking"]["rated"]).lower(),
-                    "clock.limit": initial_time,
-                    "clock.increment": increment,
-                    "variant": CONFIG["matchmaking"]["variant"],
-                    "color": "random",
-                },
-                timeout=20,
-            )
-            response.raise_for_status()
-            return response.json()["challenge"]["id"]
-        except httpx.HTTPStatusError:
-            logging.warning(f"Could not create challenge against {opponent}.")
-
-    async def cancel_challenge(self, challenge_id: str) -> bool:
-        try:
-            response = await self.client.post(f"/api/challenge/{challenge_id}/cancel")
-            response.raise_for_status()
-            return True
-        except httpx.HTTPStatusError:
-            return False
-
-    async def abort_game(self, game_id: str) -> bool:
-        try:
-            response = await self.client.post(f"/api/bot/game/{game_id}/abort")
-            response.raise_for_status()
-            return True
-        except httpx.HTTPStatusError:
-            return False
-
-    async def get_open_challenges(self) -> dict:
-        try:
-            response = await self.client.get("/api/challenge")
-            response.raise_for_status()
-            return response.json()
-        except httpx.HTTPStatusError as e:
-            logging.error(f"Could not fetch open challenges.")
-            logging.error(e)
 
     async def get_online_bots(self) -> AsyncGenerator[dict, dict]:
         try:
@@ -165,33 +97,88 @@ class Lichess:
                     bot = json.loads(line)
                     yield bot
         except httpx.HTTPStatusError as e:
-            logging.error("Could not fetch online bots.")
-            logging.error(e)
+            return
+
+    async def get_account(self) -> dict:
+        response = await self.get("/api/account")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {}
+
+    async def accept_challenge(self, challenge_id: str) -> bool:
+        response = await self.post(f"/api/challenge/{challenge_id}/accept")
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+
+    async def decline_challenge(self, challenge_id: str) -> bool:
+        response = await self.post(f"/api/challenge/{challenge_id}/decline")
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+
+    async def create_challenge(
+        self, opponent: str, initial_time: int, increment: int = 0
+    ) -> str:
+
+        response = await self.post(
+            f"/api/challenge/{opponent}",
+            data={
+                "rated": str(CONFIG["matchmaking"]["rated"]).lower(),
+                "clock.limit": initial_time,
+                "clock.increment": increment,
+                "variant": CONFIG["matchmaking"]["variant"],
+                "color": "random",
+            },
+        )
+        if response.status_code == 200:
+            return response.json()["challenge"]["id"]
+        else:
+            return ""
+
+    async def cancel_challenge(self, challenge_id: str) -> bool:
+        response = await self.post(f"/api/challenge/{challenge_id}/cancel")
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+
+    async def abort_game(self, game_id: str) -> bool:
+        response = await self.post(f"/api/bot/game/{game_id}/abort")
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+
+    async def get_open_challenges(self) -> dict:
+        response = await self.get("/api/challenge")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {}
 
     async def get_ongoing_games(self) -> list[str]:
-        try:
-            response = await self.client.get("https://lichess.org/api/account/playing")
-            response.raise_for_status()
+        response = await self.get("/api/account/playing")
+        if response.status_code == 200:
             return [game_info["gameId"] for game_info in response.json()["nowPlaying"]]
-        except httpx.HTTPStatusError as e:
-            logging.error("Could not fetch ongoing games.")
-            logging.error(e)
+        else:
             return []
 
-    @_catch_status_code
-    @backoff.on_exception(
-        backoff.expo, httpx.HTTPError, max_time=300, giveup=_is_final_error
-    )
-    async def make_move(self, game_id: str, move: chess.Move):
-        response = await self.client.post(
+    async def make_move(self, game_id: str, move: chess.Move) -> bool:
+        response = await self.post(
             f"/api/bot/game/{game_id}/move/{move.uci()}",
         )
-        response.raise_for_status()
+        if response.status_code == 200:
+            return True
+        else:
+            return False
 
     async def upgrade_account(self) -> bool:
-        try:
-            response = await self.client.post("/api/bot/account/upgrade")
-            response.raise_for_status()
+        response = await self.post("/api/bot/account/upgrade")
+        if response.status_code == 200:
             return True
-        except httpx.HTTPStatusError:
+        else:
             return False

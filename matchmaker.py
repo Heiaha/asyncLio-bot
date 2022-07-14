@@ -55,7 +55,11 @@ class Matchmaker:
         return True
 
     async def challenge(self):
-        bots = [Bot(info) async for info in self.li.get_online_bots()]
+        bots = [
+            Bot(info)
+            async for info in self.li.get_online_bots()
+            if not info.get("disabled")
+        ]
         me = next(bot for bot in bots if bot.name == self.li.username)
         random.shuffle(bots)
 

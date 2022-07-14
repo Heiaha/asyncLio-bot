@@ -47,8 +47,8 @@ class GameManager:
 
         game = Game(self.li, game_id)
         task = asyncio.create_task(game.play())
-
         self.current_games[game_id] = game, task
+
         self.event.set()
         logging.info(f"Game {game_id} starting against {opponent}.")
         logging.info(f"Current Processes: {len(self.current_games)}")
@@ -56,7 +56,13 @@ class GameManager:
     async def on_game_finish(self, event: dict):
         if (game_id := event["game"]["id"]) in self.current_games:
             game, task = self.current_games.pop(game_id)
-            await task
+
+            # await task here to return and output any potential errors, but don't let it close the event loop
+            try:
+                await task
+            except Exception as e:
+                logging.error(e)
+
         self.event.set()
         logging.info(f"Current Processes: {len(self.current_games)}")
 

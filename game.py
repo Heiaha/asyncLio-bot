@@ -97,7 +97,7 @@ class Game:
                 if not new_board.is_repetition(count=2):
                     return move
             except IndexError:
-                pass
+                return
 
     async def _get_engine_move(self) -> tuple[chess.Move, chess.engine.InfoDict]:
         if len(self.board.move_stack) < 2:
@@ -117,9 +117,11 @@ class Game:
 
     async def _make_move(self):
         if move := self._get_book_move():
-            message = f"Book: {move.uci()}"
+            message = f"{self.id} -- Book: {self.board.san(move)}"
         else:
-            logging.info(f"Searching for move from {self.board.fen()}")
+            logging.info(
+                f"Searching for move in game {self.id} from {self.board.fen()}"
+            )
             move, info = await self._get_engine_move()
             message = self._format_engine_move_message(move, info)
 
@@ -129,7 +131,7 @@ class Game:
     def _format_engine_move_message(
         self, move: chess.Move, info: chess.engine.InfoDict
     ) -> str:
-        message = ""
+        message = f"{self.id} -- Engine: "
         if self.board.turn:
             move_number = str(self.board.fullmove_number) + "."
             message += f"{move_number:4} {self.board.san(move):<10}"
