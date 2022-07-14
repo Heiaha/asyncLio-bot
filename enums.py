@@ -76,6 +76,6 @@ class PerfType(Enum):
 
     @classmethod
     def from_nonstandard_variant(cls, variant: Variant) -> "PerfType":
-        if variant == Variant.FROM_POSITION:
-            raise ValueError("'From Position' not supported as a performance type.")
+        if variant in (Variant.STANDARD, Variant.FROM_POSITION):
+            raise ValueError(f"{variant} not supported as a performance type.")
         return cls(variant.value)
