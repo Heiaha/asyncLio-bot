@@ -18,10 +18,10 @@ class EventHandler:
                 continue
 
             elif event_type == Event.GAME_START:
-                self.game_manager.on_game_start(event)
+                await self.game_manager.on_game_start(event)
 
             elif event_type == Event.GAME_FINISH:
-                self.game_manager.on_game_finish()
+                self.game_manager.on_game_finish(event)
 
             elif event_type == Event.CHALLENGE:
                 await self.game_manager.on_challenge(event)

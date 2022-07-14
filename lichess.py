@@ -9,7 +9,7 @@ from typing import Callable
 from config import CONFIG
 
 
-def _is_final_error(e: Exception) -> bool:
+def _is_final_error(e: httpx.HTTPError) -> bool:
     return isinstance(e, httpx.HTTPStatusError) and e.response.status_code < 500
 
 
@@ -85,6 +85,8 @@ class Lichess:
                         yield event
                 return
             except Exception as e:
+                if game_id not in await self.get_ongoing_games():
+                    return
                 logging.error("Error while watching game stream.")
                 logging.error(e)
 
@@ -112,14 +114,16 @@ class Lichess:
         except httpx.HTTPStatusError:
             return False
 
-    async def create_challenge(self, challenge: dict) -> str | None:
+    async def create_challenge(
+        self, opponent: str, initial_time: int, increment: int
+    ) -> str | None:
         try:
             response = await self.client.post(
-                f"https://lichess.org/api/challenge/{challenge['opponent']}",
+                f"https://lichess.org/api/challenge/{opponent}",
                 data={
                     "rated": str(CONFIG["matchmaking"]["rated"]).lower(),
-                    "clock.limit": challenge["tc_seconds"],
-                    "clock.increment": challenge["tc_increment"],
+                    "clock.limit": initial_time,
+                    "clock.increment": increment,
                     "variant": CONFIG["matchmaking"]["variant"],
                     "color": "random",
                 },
@@ -128,14 +132,22 @@ class Lichess:
             response.raise_for_status()
             return response.json()["challenge"]["id"]
         except httpx.HTTPStatusError:
-            logging.warning(
-                f"Could not create challenge against {challenge['opponent']}."
-            )
+            logging.warning(f"Could not create challenge against {opponent}.")
 
     async def cancel_challenge(self, challenge_id: str) -> bool:
         try:
             response = await self.client.post(
                 f"https://lichess.org/api/challenge/{challenge_id}/cancel"
+            )
+            response.raise_for_status()
+            return True
+        except httpx.HTTPStatusError:
+            return False
+
+    async def abort_game(self, game_id: str):
+        try:
+            response = await self.client.post(
+                f"https://lichess.org/api/bot/game/{game_id}/abort"
             )
             response.raise_for_status()
             return True
@@ -164,14 +176,15 @@ class Lichess:
             logging.error("Could not fetch online bots.")
             logging.error(e)
 
-    async def get_ongoing_games(self):
+    async def get_ongoing_games(self) -> list[str]:
         try:
             response = await self.client.get("https://lichess.org/api/account/playing")
-            for game_info in response.json()["nowPlaying"]:
-                yield game_info
+            response.raise_for_status()
+            return [game_info["gameId"] for game_info in response.json()["nowPlaying"]]
         except httpx.HTTPStatusError as e:
             logging.error("Could not fetch ongoing games.")
             logging.error(e)
+            return []
 
     @_catch_status_code
     @backoff.on_exception(
@@ -180,16 +193,6 @@ class Lichess:
     async def make_move(self, game_id: str, move: chess.Move):
         response = await self.client.post(
             f"https://lichess.org/api/bot/game/{game_id}/move/{move.uci()}",
-        )
-        response.raise_for_status()
-
-    @_catch_status_code
-    @backoff.on_exception(
-        backoff.expo, httpx.HTTPError, max_time=300, giveup=_is_final_error
-    )
-    async def abort_game(self, game_id: str):
-        response = await self.client.post(
-            f"https://lichess.org/api/bot/game/{game_id}/abort"
         )
         response.raise_for_status()
 

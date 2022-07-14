@@ -12,40 +12,53 @@ class GameManager:
     def __init__(self, li: Lichess):
         self.li: Lichess = li
         self.matchmaker: Matchmaker = Matchmaker(self.li)
-        self.current_games: int = 0
+        self.current_games: dict[str, Game] = {}
         self.challenge_queue: deque[str] = deque()
         self.event: asyncio.Event = asyncio.Event()
 
     async def run(self):
         while True:
+            self._clean_games()
+
             try:
                 await asyncio.wait_for(
                     self.event.wait(), timeout=CONFIG["matchmaking"]["timeout"]
                 )
             except asyncio.TimeoutError:
-                if self._is_under_concurrency() and CONFIG["matchmaking"]["enabled"]:
-                    asyncio.create_task(self.matchmaker.challenge())
+                if (
+                    self._is_under_concurrency_limit()
+                    and CONFIG["matchmaking"]["enabled"]
+                ):
+                    await self.matchmaker.challenge()
                 continue
 
             self.event.clear()
 
-            while self._is_under_concurrency() and self.challenge_queue:
+            while self._is_under_concurrency_limit() and self.challenge_queue:
                 await self.li.accept_challenge(self.challenge_queue.popleft())
 
-    def on_game_start(self, event: dict):
+    async def on_game_start(self, event: dict):
         game_id = event["game"]["id"]
         opponent = event["game"]["opponent"]["username"]
+
+        # If this is an extremely late acceptance of a challenge we issued earlier
+        # that would bring us over our concurrency limit, abort it.
+        if not self._is_under_concurrency_limit():
+            await self.li.abort_game(game_id)
+            return
+
         game = Game(self.li, game_id)
+        self.current_games[game_id] = game
         asyncio.create_task(game.play())
-        self.current_games += 1
         self.event.set()
         logging.info(f"Game {game_id} starting against {opponent}.")
-        logging.info(f"Current Processes: {self.current_games}")
+        logging.info(f"Current Processes: {len(self.current_games)}")
 
-    def on_game_finish(self):
-        self.current_games -= 1
+    def on_game_finish(self, event: dict):
+        if (game_id := event["game"]["id"]) in self.current_games:
+            self.current_games.pop(game_id)
         self.event.set()
-        logging.info(f"Current Processes: {self.current_games}")
+        logging.info(f"Current Processes: {len(self.current_games)}")
 
     async def on_challenge(self, event: dict):
         challenge_id = event["challenge"]["id"]
@@ -65,8 +78,8 @@ class GameManager:
         if challenge_id in self.challenge_queue:
             self.challenge_queue.remove(challenge_id)
 
-    def _is_under_concurrency(self) -> bool:
-        return self.current_games < CONFIG["concurrency"]
+    def _is_under_concurrency_limit(self) -> bool:
+        return len(self.current_games) < CONFIG["concurrency"]
 
     @staticmethod
     def _should_accept(event: dict) -> bool:
@@ -100,3 +113,10 @@ class GameManager:
             return False
 
         return True
+
+    def _clean_games(self):
+        self.current_games = {
+            game_id: game
+            for game_id, game in self.current_games.items()
+            if not game.is_game_over()
+        }

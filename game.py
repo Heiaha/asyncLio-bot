@@ -13,6 +13,7 @@ class Game:
     def __init__(self, li: Lichess, game_id: str):
         self.li: Lichess = li
         self.id: str = game_id
+        self.status: GameStatus = GameStatus.CREATED
         self.board: chess.Board = chess.Board()
 
         # attributes to be set up asynchronously when the game starts
@@ -23,7 +24,6 @@ class Game:
         self.increment: int | None = None
         self.white_name: str | None = None
         self.black_name: str | None = None
-        self.status: GameStatus | None = None
         self.variant: Variant | None = None
         self.engine: chess.engine.UciProtocol | None = None
 
@@ -70,8 +70,8 @@ class Game:
 
         return board
 
-    def _is_game_over(self):
-        return self.status != GameStatus.STARTED
+    def is_game_over(self):
+        return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
 
     def _is_our_turn(self):
         return self.color == self.board.turn
@@ -198,7 +198,7 @@ class Game:
                 if event_type == GameEvent.GAME_FULL:
                     # on lichess restarts a gameFull message will be sent, even if the game is underway.
                     # check if we've already done a setup
-                    if self.status is None:
+                    if self.status == GameStatus.CREATED:
                         await self._setup(event)
                     else:
                         self._update(event["state"])
@@ -209,7 +209,7 @@ class Game:
                 elif event_type == GameEvent.GAME_STATE:
                     self._update(event)
 
-                    if self._is_game_over():
+                    if self.is_game_over():
                         message = self._format_result_message(event.get("winner"))
                         logging.info(message)
                         break
@@ -227,6 +227,12 @@ class Game:
                     ):
                         await self.li.abort_game(self.id)
                         break
+
+            # It's possible we've reached this stage because the server has 502'd
+            # and the iterator has unexpectedly closed without setting the status to be finished.
+            # If that's true we need to set the game to be over, so that it can be cleaned up by the game manager loop.
+            if not self.is_game_over():
+                self.status = GameStatus.UNKNOWN_FINISH
 
             logging.info("Quitting engine.")
             await self.engine.quit()

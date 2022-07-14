@@ -39,7 +39,8 @@ class Matchmaker:
     def __init__(self, li: Lichess):
         self.li: Lichess = li
 
-    def _should_challenge(self, bot: Bot, me: Bot, perf_type: PerfType) -> bool:
+    @staticmethod
+    def _should_challenge(bot: Bot, me: Bot, perf_type: PerfType) -> bool:
         if bot == me:
             return False
         if (
@@ -70,20 +71,9 @@ class Matchmaker:
 
             if self._should_challenge(bot, me, perf_type):
                 logging.info(
-                    f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds} seconds."
+                    f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds//60}+{tc_increment}."
                 )
 
-                challenge = {
-                    "opponent": bot.name,
-                    "tc_seconds": tc_seconds,
-                    "tc_increment": tc_increment,
-                }
-
                 # Send challenge request.
-                challenge_id = await self.li.create_challenge(challenge)
-
-                # Wait 20 seconds and try to cancel the challenge in case it hasn't been responded to.
-                await asyncio.sleep(20)
-                if challenge_id:
-                    await self.li.cancel_challenge(challenge_id)
+                await self.li.create_challenge(bot.name, tc_seconds, tc_increment)
                 return
