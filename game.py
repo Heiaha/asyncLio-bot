@@ -49,7 +49,7 @@ class Game:
         if options := CONFIG["engine"].get("uci_options"):
             await engine.configure(options)
         self.engine = engine
-        self.start_time = time.time()
+        self.start_time = time.monotonic()
 
     def _update(self, event: dict):
 
@@ -223,7 +223,7 @@ class Game:
                     if (
                         len(self.board.move_stack) < 2
                         and not self._is_our_turn()
-                        and time.time() > self.start_time + CONFIG["abort_time"]
+                        and time.monotonic() > self.start_time + CONFIG["abort_time"]
                     ):
                         await self.li.abort_game(self.id)
                         abort_count += 1
