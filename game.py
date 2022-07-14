@@ -13,7 +13,6 @@ from lichess import Lichess
 
 class Game:
     def __init__(self, li: Lichess, event: dict) -> None:
-        logging.info(event)
         self.li: Lichess = li
         self.id: str = event["game"]["gameId"]
         self.color: chess.Color = (
