@@ -92,8 +92,8 @@ class Game:
             limit = chess.engine.Limit(time=10)
         else:
             limit = chess.engine.Limit(
-                white_clock=self.white_time / 1000,
-                black_clock=self.black_time / 1000,
+                white_clock=max(self.white_time - CONFIG["move_overhead"], 0) / 1000,
+                black_clock=max(self.black_time - CONFIG["move_overhead"], 0) / 1000,
                 white_inc=self.white_inc / 1000,
                 black_inc=self.black_inc / 1000,
             )
@@ -183,8 +183,10 @@ class Game:
                 message = "Game drawn by agreement."
         elif self.status == GameStatus.STALEMATE:
             message = "Game drawn by stalemate."
-        else:
+        elif self.status == GameStatus.ABORTED:
             message = "Game aborted."
+        else:
+            message = "Game finish unknown."
         return message
 
     def is_game_over(self) -> bool:
