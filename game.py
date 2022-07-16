@@ -79,14 +79,15 @@ class Game:
         else:
             return
 
+        board = self.board.copy()
         for book in books:
             with chess.polyglot.open_reader(book) as reader:
                 try:
-                    move = reader.weighted_choice(self.board).move
-                    new_board = self.board.copy()
-                    new_board.push(move)
-                    if not new_board.is_repetition(count=2):
+                    move = reader.weighted_choice(board).move
+                    board.push(move)
+                    if not board.is_repetition(count=2):
                         return move
+                    board.pop()
                 except IndexError:
                     pass
 
