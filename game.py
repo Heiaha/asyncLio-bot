@@ -64,28 +64,31 @@ class Game:
         return self.color == self.board.turn
 
     def _get_book_move(self) -> chess.Move | None:
-        if not CONFIG["book"]["enabled"]:
+        if not CONFIG["books"]["enabled"]:
             return
 
-        if self.board.chess960 and (chess960_path := CONFIG["book"].get("chess960")):
-            book_path = chess960_path
-        elif standard_path := CONFIG["book"].get("standard"):
-            book_path = standard_path
+        if self.board.ply() > CONFIG["books"].get("depth", 10):
+            return
+
+        if self.board.uci_variant == "chess" and (
+            standard_paths := CONFIG["books"].get("standard")
+        ):
+            books = standard_paths
+        elif variant_paths := CONFIG["books"].get(self.board.uci_variant):
+            books = variant_paths
         else:
             return
 
-        if self.board.ply() > CONFIG["book"].get("depth", 10):
-            return
-
-        with chess.polyglot.open_reader(book_path) as reader:
-            try:
-                move = reader.weighted_choice(self.board).move
-                new_board = self.board.copy()
-                new_board.push(move)
-                if not new_board.is_repetition(count=2):
-                    return move
-            except IndexError:
-                return
+        for book in books:
+            with chess.polyglot.open_reader(book) as reader:
+                try:
+                    move = reader.weighted_choice(self.board).move
+                    new_board = self.board.copy()
+                    new_board.push(move)
+                    if not new_board.is_repetition(count=2):
+                        return move
+                except IndexError:
+                    pass
 
     async def _get_engine_move(self) -> tuple[chess.Move, chess.engine.InfoDict]:
         if len(self.board.move_stack) < 2:

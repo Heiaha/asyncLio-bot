@@ -1,17 +1,25 @@
 token: "XXXXXXXXXXXXXXX"
-concurrency: 1                # Number of games to play simultaneously.
-abort_time: 20                # Amount of time (in s) to abort game start after no activity.
-move_overhead : 2000          # Amount of time (in ms) to subtract from each move.
+concurrency: 1               # Number of games to play simultaneously.
+abort_time: 20               # Amount of time (in s) to abort game start after no activity.
+move_overhead : 2000         # Amount of time (in ms) to subtract from each move.
 engine:
-  path: "/path/to/engine"
+  path: /path/to/engine
   uci_options:               # Arbitrary UCI options passed to the engine. Can be commented out or changed.
-#    Threads: 1               # Max CPU threads the engine can use.
-#    Hash: 128                # Hash size (in MB).
-book:
+#    Threads: 1              # Max CPU threads the engine can use.
+#    Hash: 128               # Hash size (in MB).
+books:
   enabled: true
-  standard: "path/to/book"
-#  chess960: "path/to/960"
+  selection: weighted_random
   depth: 10
+  standard:                  # List of book file paths for variant standard.
+    - path/to/book
+    - path/to/second/book
+  chess960:                  # List of book file paths for variant chess960.
+    - path/to/960
+    - path/to/second/960
+  atomic:                    # List of book file paths for variant atomic.
+    - path/to/atomic
+                             # etc. (add other variant books as desired)
 challenge:                   # Incoming challenges.
   enabled: false             # Flag for controlling if any challenges get accepted. Overrides all other flags.
   max_increment: 60          # Maximum amount of increment to accept a challenge. The max is 180. Set to 0 for no increment.
