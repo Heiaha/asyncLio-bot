@@ -92,8 +92,10 @@ class Game:
             limit = chess.engine.Limit(time=10)
         else:
             limit = chess.engine.Limit(
-                white_clock=max(self.white_time - CONFIG["move_overhead"], 0) / 1000,
-                black_clock=max(self.black_time - CONFIG["move_overhead"], 0) / 1000,
+                white_clock=max(self.white_time - CONFIG.get("move_overhead", 0), 0)
+                / 1000,
+                black_clock=max(self.black_time - CONFIG.get("move_overhead", 0), 0)
+                / 1000,
                 white_inc=self.white_inc / 1000,
                 black_inc=self.black_inc / 1000,
             )

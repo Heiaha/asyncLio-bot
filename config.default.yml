@@ -1,6 +1,6 @@
 token: "XXXXXXXXXXXXXXX"
 concurrency: 1                # Number of games to play simultaneously.
-abort_time: 20                # Amount of time to abort game start after no activity.
+abort_time: 20                # Amount of time (in s) to abort game start after no activity.
 move_overhead : 2000          # Amount of time (in ms) to subtract from each move.
 engine:
   path: "/path/to/engine"
