@@ -118,6 +118,7 @@ class Game:
 
     async def _make_move(self) -> None:
         offer_draw = False
+        resign = False
         if move := self._get_book_move():
             message = f"{self.id} -- Book: {self.board.san(move)}"
         else:
@@ -126,12 +127,14 @@ class Game:
             )
             move, info = await self._get_engine_move()
             message = self._format_engine_move_message(move, info)
+            resign = self._should_resign()
             offer_draw = self._should_draw()
 
         logging.info(message)
-        if offer_draw:
-            logging.info("Offering draw...")
-        await self.li.make_move(self.id, move, offer_draw=offer_draw)
+        if resign:
+            await self.li.resign_game(self.id)
+        else:
+            await self.li.make_move(self.id, move, offer_draw=offer_draw)
 
     def _should_draw(self) -> bool:
         if not CONFIG["draw"]["enabled"]:
@@ -144,8 +147,20 @@ class Game:
             return False
 
         return all(
-            abs(score.relative.score()) < chess.engine.Cp(CONFIG["draw"]["score"])
+            abs(score.relative) <= chess.engine.Cp(CONFIG["draw"]["score"])
             for score in self.scores[-CONFIG["draw"]["moves"] :]
+        )
+
+    def _should_resign(self) -> bool:
+        if not CONFIG["resign"]["enabled"]:
+            return False
+
+        if len(self.scores) < CONFIG["resign"]["moves"]:
+            return False
+
+        return all(
+            score.relative <= chess.engine.Cp(CONFIG["resign"]["score"])
+            for score in self.scores[-CONFIG["resign"]["moves"] :]
         )
 
     def _format_engine_move_message(

@@ -152,6 +152,13 @@ class Lichess:
         else:
             return False
 
+    async def resign_game(self, game_id: str) -> bool:
+        response = await self.post(f"/api/bot/game/{game_id}/resign")
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+
     async def get_open_challenges(self) -> dict:
         response = await self.get("/api/challenge")
         if response.status_code == 200:
