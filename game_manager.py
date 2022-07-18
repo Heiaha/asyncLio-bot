@@ -24,10 +24,7 @@ class GameManager:
                     self.event.wait(), timeout=CONFIG["matchmaking"]["timeout"]
                 )
             except asyncio.TimeoutError:
-                if (
-                    self._is_under_concurrency_limit()
-                    and CONFIG["matchmaking"]["enabled"]
-                ):
+                if self._is_under_concurrency_limit():
                     await self.matchmaker.challenge()
                 continue
 
@@ -81,8 +78,7 @@ class GameManager:
             await self.li.decline_challenge(challenge_id)
 
     def on_challenge_cancelled(self, event: dict) -> None:
-        challenge_id = event["challenge"]["id"]
-        if challenge_id in self.challenge_queue:
+        if (challenge_id := event["challenge"]["id"]) in self.challenge_queue:
             self.challenge_queue.remove(challenge_id)
 
     def _is_under_concurrency_limit(self) -> bool:

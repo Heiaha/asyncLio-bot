@@ -1,17 +1,18 @@
 token: "XXXXXXXXXXXXXXX"
 concurrency: 1               # Number of games to play simultaneously.
 abort_time: 20               # Amount of time (in s) to abort game start after no activity.
-move_overhead : 2000         # Amount of time (in ms) to subtract from each move.
+move_overhead : 2000         # Amount of time (in ms) to subtract from each move before being given to the engine.
 engine:
   path: /path/to/engine
   uci_options:               # Arbitrary UCI options passed to the engine. Can be commented out or changed.
 #    Threads: 1              # Max CPU threads the engine can use.
 #    Hash: 128               # Hash size (in MB).
+
 books:
-  enabled: true
+  enabled: false
   selection: weighted_random
   depth: 10
-  standard:                  # List of book file paths for variant standard.
+  standard:                  # List of book file paths for variant standard. Add additional books or variants.
     - path/to/book
     - path/to/second/book
   chess960:                  # List of book file paths for variant chess960.
@@ -19,7 +20,7 @@ books:
     - path/to/second/960
   atomic:                    # List of book file paths for variant atomic.
     - path/to/atomic
-                             # etc. (add other variant books as desired)
+
 challenge:                   # Incoming challenges.
   enabled: false             # Flag for controlling if any challenges get accepted. Overrides all other flags.
   max_increment: 60          # Maximum amount of increment to accept a challenge. The max is 180. Set to 0 for no increment.
@@ -42,6 +43,13 @@ challenge:                   # Incoming challenges.
     - blitz
     - rapid
     - classical
+
+draw:                        # Whether to offer/accept draws under certain conditions.
+  enabled: false
+  score: 0                   # If engine score is less than or equal to this value, the bot offers/accepts draw (in cp).
+  moves: 5                   # How many *full moves* in a row the absolute value of the score has to be below the draw value.
+  min_game_length: 35        # Only offer/accept a draw if the number of *full moves* on board is fewer than this value.
+
 matchmaking:
   enabled: false
   variant: standard

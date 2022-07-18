@@ -22,9 +22,11 @@ class Game:
         self.initial_fen: str = event["game"]["fen"]
         self.variant: Variant = Variant(event["game"]["variant"]["key"])
         self.status: GameStatus = GameStatus.CREATED
+        self.scores: list[chess.engine.PovScore] = []
         self.board: chess.Board = self._setup_board()
 
         # attributes to be set up asynchronously or after the game starts
+        self.move_start_time: int | None = None
         self.white_time: int | None = None
         self.black_time: int | None = None
         self.white_inc: int | None = None
@@ -106,10 +108,16 @@ class Game:
 
         result = await self.engine.play(self.board, limit, info=chess.engine.INFO_ALL)
         if result.move:
+            score = result.info.get(
+                "score", chess.engine.PovScore(chess.engine.Mate(1), self.board.turn)
+            )
+            self.scores.append(score)
             return result.move, result.info
+
         raise RuntimeError("Engine could not make a move.")
 
     async def _make_move(self) -> None:
+        offer_draw = False
         if move := self._get_book_move():
             message = f"{self.id} -- Book: {self.board.san(move)}"
         else:
@@ -118,9 +126,27 @@ class Game:
             )
             move, info = await self._get_engine_move()
             message = self._format_engine_move_message(move, info)
+            offer_draw = self._should_draw()
 
         logging.info(message)
-        await self.li.make_move(self.id, move)
+        if offer_draw:
+            logging.info("Offering draw...")
+        await self.li.make_move(self.id, move, offer_draw=offer_draw)
+
+    def _should_draw(self) -> bool:
+        if not CONFIG["draw"]["enabled"]:
+            return False
+
+        if self.board.fullmove_number < CONFIG["draw"]["min_game_length"]:
+            return False
+
+        if len(self.scores) < CONFIG["draw"]["moves"]:
+            return False
+
+        return all(
+            abs(score.relative.score()) < chess.engine.Cp(CONFIG["draw"]["score"])
+            for score in self.scores[-CONFIG["draw"]["moves"] :]
+        )
 
     def _format_engine_move_message(
         self, move: chess.Move, info: chess.engine.InfoDict

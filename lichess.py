@@ -166,9 +166,12 @@ class Lichess:
         else:
             return []
 
-    async def make_move(self, game_id: str, move: chess.Move) -> bool:
+    async def make_move(
+        self, game_id: str, move: chess.Move, offer_draw: bool = False
+    ) -> bool:
         response = await self.post(
             f"/api/bot/game/{game_id}/move/{move.uci()}",
+            params={"offeringDraw": str(offer_draw).lower()},
         )
         if response.status_code == 200:
             return True
