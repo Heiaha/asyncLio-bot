@@ -44,8 +44,8 @@ class GameManager:
             return
 
         game = Game(self.li, event)
-        task = asyncio.create_task(game.play())
-        self.current_games[game_id] = game, task
+        game.play()  # non-blocking task creation
+        self.current_games[game_id] = game
 
         self.event.set()
         logging.info(f"Game {game_id} starting against {opponent}.")
@@ -53,11 +53,11 @@ class GameManager:
 
     async def on_game_finish(self, event: dict) -> None:
         if (game_id := event["game"]["id"]) in self.current_games:
-            game, task = self.current_games.pop(game_id)
+            game = self.current_games.pop(game_id)
 
             # await task here to return and output any potential errors, but don't let it close the event loop
             try:
-                await task
+                await game.task
             except Exception as e:
                 logging.error(e)
 
@@ -120,7 +120,7 @@ class GameManager:
         # Sometimes the lichess game loop seems to close without the event loop sending a "gameFinish" event
         # but still having closed the game stream. This function will take case of those cases.
         self.current_games = {
-            game_id: (game, task)
-            for game_id, (game, task) in self.current_games.items()
+            game_id: game
+            for game_id, game in self.current_games.items()
             if not game.is_game_over()
         }

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 
@@ -26,6 +27,7 @@ class Game:
         self.board: chess.Board = self._setup_board()
 
         # attributes to be set up asynchronously or after the game starts
+        self.task: asyncio.Task | None = None
         self.move_start_time: int | None = None
         self.white_time: int | None = None
         self.black_time: int | None = None
@@ -236,10 +238,7 @@ class Game:
             message = "Game finish unknown."
         return message
 
-    def is_game_over(self) -> bool:
-        return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
-
-    async def play(self):
+    async def _play(self):
         abort_count = 0
         await self._setup()
         async for event in self.li.watch_game_stream(self.id):
@@ -283,3 +282,9 @@ class Game:
 
         logging.info("Quitting engine.")
         await self.engine.quit()
+
+    def is_game_over(self) -> bool:
+        return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
+
+    def play(self) -> None:
+        self.task = asyncio.create_task(self._play())
