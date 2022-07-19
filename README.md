@@ -5,7 +5,7 @@ It handles multiple concurrent games and includes a matchmaker.
 ## Installation
 To use asyncLio-bot (**requires Python 3.10 or later**):
 * Clone the repo as `git clone git@github.com:Heiaha/asyncLio-bot.git`.
-* Copy `config.yml.default` to `config.yml` and customize to your liking.
+* Copy `config.default.yml` to `config.yml` and customize to your liking.
 * Install the required packages in your environment (preferably using venv or conda) like `python -m pip install -r requirements.txt
 `.
 
