@@ -28,6 +28,7 @@ class Game:
 
         # attributes to be set up asynchronously or after the game starts
         self.task: asyncio.Task | None = None
+        self.start_time: int | None = None
         self.white_time: int | None = None
         self.black_time: int | None = None
         self.white_inc: int | None = None
