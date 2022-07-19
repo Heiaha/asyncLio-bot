@@ -1,5 +1,4 @@
 import json
-import asyncio
 from typing import AsyncIterator
 
 import backoff
