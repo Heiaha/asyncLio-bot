@@ -43,7 +43,7 @@ class Lichess:
         else:
             response.raise_for_status()
 
-    async def watch_control_stream(self) -> AsyncIterator[dict]:
+    async def watch_event_stream(self) -> AsyncIterator[dict]:
         while True:
             try:
                 async with self.client.stream(
