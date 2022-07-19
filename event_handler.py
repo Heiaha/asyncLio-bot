@@ -15,6 +15,7 @@ class EventHandler:
         asyncio.create_task(self.game_manager.run())
         async for event in self.li.watch_event_stream():
             event_type = Event(event["type"])
+
             if event_type == Event.PING:
                 self.game_manager.clean_games()
 
