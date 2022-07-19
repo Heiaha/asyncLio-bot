@@ -17,7 +17,6 @@ class EventHandler:
             event_type = Event(event["type"])
             if event_type == Event.PING:
                 self.game_manager.clean_games()
-                continue
 
             elif event_type == Event.GAME_START:
                 await self.game_manager.on_game_start(event)
