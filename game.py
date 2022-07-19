@@ -243,6 +243,7 @@ class Game:
         await self._setup()
         async for event in self.li.watch_game_stream(self.id):
             event_type = GameEvent(event["type"])
+
             if event_type == GameEvent.GAME_FULL:
                 self._update(event["state"])
                 if self._is_our_turn():
