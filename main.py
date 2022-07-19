@@ -45,7 +45,7 @@ async def main(args: argparse.Namespace) -> NoReturn:
         return
 
     if li.title != "BOT":
-        logging.error("Hermod can only be used by BOT accounts.")
+        logging.error("asyncLio-bot can only be used by BOT accounts.")
         return
 
     logging.info(f"Logged in as {li.title} {li.username}")

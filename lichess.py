@@ -20,7 +20,7 @@ class Lichess:
         self.username = user_info["username"]
         self.title = user_info.get("title", "")
 
-        headers["User-Agent"] = f"Hermod user:{self.username}"
+        headers["User-Agent"] = f"asyncLio-bot user:{self.username}"
 
         self.client = httpx.AsyncClient(
             base_url="https://lichess.org",
