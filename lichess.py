@@ -1,4 +1,5 @@
 import json
+import asyncio
 from typing import AsyncIterator
 
 import backoff
@@ -10,30 +11,22 @@ from config import CONFIG
 
 class Lichess:
     def __init__(self) -> None:
-        self.token = CONFIG["token"]
-        self.headers = {
-            "Authorization": f"Bearer {self.token}",
+
+        headers = {
+            "Authorization": f"Bearer {CONFIG['token']}",
         }
 
+        user = httpx.get("https://lichess.org/api/account", headers=headers).json()
+
+        self.username = user["username"]
+        self.title = user.get("title", "")
+
+        headers["User-Agent"] = f"Hermod user:{self.username}"
+
         self.client = httpx.AsyncClient(
-            base_url="https://lichess.org", headers=self.headers
+            base_url="https://lichess.org",
+            headers=headers,
         )
-
-        self.user: dict | None = None
-
-    @classmethod
-    async def create(cls) -> "Lichess":
-        li = cls()
-        li.user = await li.get_account()
-        return li
-
-    @property
-    def username(self) -> str:
-        return self.user["username"]
-
-    @property
-    def title(self) -> str:
-        return self.user.get("title", "")
 
     @backoff.on_exception(backoff.expo, httpx.HTTPStatusError)
     async def get(self, endpoint: str, **kwargs) -> httpx.Response:
@@ -97,13 +90,6 @@ class Lichess:
                     yield bot
         except httpx.HTTPStatusError as e:
             return
-
-    async def get_account(self) -> dict:
-        response = await self.get("/api/account")
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {}
 
     async def accept_challenge(self, challenge_id: str) -> bool:
         response = await self.post(f"/api/challenge/{challenge_id}/accept")

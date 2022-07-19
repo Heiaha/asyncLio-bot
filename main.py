@@ -31,7 +31,8 @@ async def main(args: argparse.Namespace) -> NoReturn:
         handlers=logging_handlers,
     )
     logging.info(LOGO)
-    li = await Lichess.create()
+
+    li = Lichess()
 
     if args.upgrade:
         if li.title == "BOT":
