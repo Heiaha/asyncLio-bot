@@ -40,13 +40,13 @@ class Bot:
 class Matchmaker:
     def __init__(self, li: Lichess) -> None:
         self.li: Lichess = li
+        self._me: Bot | None = None
 
-    @staticmethod
-    def _should_challenge(bot: Bot, me: Bot, perf_type: PerfType) -> bool:
-        if bot == me:
+    def _should_challenge(self, bot: Bot, perf_type: PerfType) -> bool:
+        if bot == self._me:
             return False
         if (
-            abs(bot.rating(perf_type) - me.rating(perf_type))
+            abs(bot.rating(perf_type) - self._me.rating(perf_type))
             > CONFIG["matchmaking"]["max_rating_diff"]
         ):
             return False
@@ -65,7 +65,7 @@ class Matchmaker:
             async for info in self.li.get_online_bots()
             if not info.get("disabled")
         ]
-        me = next(bot for bot in bots if bot.name == self.li.username)
+        self._me = next(bot for bot in bots if bot.name == self.li.username)
         random.shuffle(bots)
 
         variant = Variant(CONFIG["matchmaking"]["variant"])
@@ -78,9 +78,9 @@ class Matchmaker:
 
         for bot in bots:
 
-            if self._should_challenge(bot, me, perf_type):
+            if self._should_challenge(bot, perf_type):
                 logging.info(
-                    f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds//60}+{tc_increment}."
+                    f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds/60}+{tc_increment}."
                 )
 
                 # Send challenge request.
