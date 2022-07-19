@@ -13,7 +13,7 @@ class GameManager:
     def __init__(self, li: Lichess) -> None:
         self.li: Lichess = li
         self.matchmaker: Matchmaker = Matchmaker(self.li)
-        self.current_games: dict[str, (Game, asyncio.Task)] = {}
+        self.current_games: dict[str, Game] = {}
         self.challenge_queue: deque[str] = deque()
         self.event: asyncio.Event = asyncio.Event()
 
