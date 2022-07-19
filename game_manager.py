@@ -87,16 +87,15 @@ class GameManager:
     @staticmethod
     def _should_accept(event: dict) -> bool:
 
+        if not CONFIG["challenge"]["enabled"]:
+            return False
+
         allowed_variants = CONFIG["challenge"]["variants"]
         allowed_tcs = CONFIG["challenge"]["time_controls"]
         min_increment = CONFIG["challenge"].get("min_increment", 0)
         max_increment = CONFIG["challenge"].get("max_increment", 180)
         min_initial = CONFIG["challenge"].get("min_initial", 0)
         max_initial = CONFIG["challenge"].get("max_initial", 315360000)
-
-        enabled = CONFIG["challenge"]["enabled"]
-        if not enabled:
-            return False
 
         variant = event["challenge"]["variant"]["key"]
         if variant not in allowed_variants:
