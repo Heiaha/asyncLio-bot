@@ -14,7 +14,7 @@ To use asyncLio-bot (**requires Python 3.10 or later**):
 * [Create a new OAuth token](https://lichess.org/account/oauth/token/create?scopes%5B%5D=bot:play&description=asyncLio-bot) with the "Play games with the bot API" permission.
 * Use this token in your config.yml file.
 
-## Upgrade to BOT Account
+## Upgrade to a BOT Account
 To use asyncLio-bot your account must be upgraded to a BOT, which requires it to not have played any games. 
 Make sure this is something you desire, as it is **irreversible**.
 For a bit more information, see the relevant [announcement](https://lichess.org/blog/WvDNticAAMu_mHKP/welcome-lichess-bots).
