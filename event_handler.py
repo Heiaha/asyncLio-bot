@@ -27,8 +27,5 @@ class EventHandler:
             elif event_type == Event.CHALLENGE:
                 await self.game_manager.on_challenge(event)
 
-            elif event_type == Event.CHALLENGE_DECLINED:
-                continue
-
             elif event_type == Event.CHALLENGE_CANCELED:
                 self.game_manager.on_challenge_cancelled(event)
