@@ -15,10 +15,10 @@ class Lichess:
             "Authorization": f"Bearer {CONFIG['token']}",
         }
 
-        user = httpx.get("https://lichess.org/api/account", headers=headers).json()
+        user_info = httpx.get("https://lichess.org/api/account", headers=headers).json()
 
-        self.username = user["username"]
-        self.title = user.get("title", "")
+        self.username = user_info["username"]
+        self.title = user_info.get("title", "")
 
         headers["User-Agent"] = f"Hermod user:{self.username}"
 
