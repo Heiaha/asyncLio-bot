@@ -42,15 +42,21 @@ class Game:
         self.engine = engine
         self.start_time = time.monotonic()
 
-    def _update(self, event: dict) -> None:
+    def _update(self, event: dict) -> bool:
         self.status = GameStatus(event["status"])
-        self.board = self._setup_board(event)
+
+        moves = event["moves"].split()
+        if len(moves) <= len(self.board.move_stack):
+            return False
+
+        self.board = self._setup_board(moves)
         self.white_time = event["wtime"]
         self.black_time = event["btime"]
         self.white_inc = event["winc"]
         self.black_inc = event["binc"]
+        return True
 
-    def _setup_board(self, event: dict | None = None) -> chess.Board:
+    def _setup_board(self, moves: list[str] | None = None) -> chess.Board:
         if self.variant == Variant.CHESS960:
             board = chess.Board(self.initial_fen, chess960=True)
         elif self.variant == Variant.FROM_POSITION:
@@ -58,10 +64,9 @@ class Game:
         else:
             board = chess.variant.find_variant(self.variant.value)()
 
-        if event:
-            move_strs = event["moves"].split()
-            for move_str in move_strs:
-                board.push_uci(move_str)
+        if moves:
+            for move in moves:
+                board.push_uci(move)
         return board
 
     def _is_our_turn(self) -> bool:
@@ -250,14 +255,14 @@ class Game:
                     await self._make_move()
 
             elif event_type == GameEvent.GAME_STATE:
-                self._update(event)
+                updated = self._update(event)
 
                 if self.is_game_over():
                     message = self._format_result_message(event.get("winner"))
                     logging.info(message)
                     break
 
-                if self._is_our_turn():
+                if self._is_our_turn() and updated:
                     await self._make_move()
 
             elif event_type == GameEvent.PING:
