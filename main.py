@@ -1,10 +1,10 @@
 import argparse
 import asyncio
-import logging
 from argparse import ArgumentParser
 from typing import NoReturn
 
 import chess.engine
+from loguru import logger
 
 from event_handler import EventHandler
 from lichess import Lichess
@@ -20,34 +20,28 @@ LOGO = """
 
 
 async def main(args: argparse.Namespace) -> NoReturn:
-    logging_handlers = [logging.StreamHandler()]
     if args.log:
-        logging_handlers.append(logging.FileHandler(args.log))
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=logging_handlers,
-    )
-    logging.info(LOGO)
+        logger.add(args.log)
+
+    logger.info(LOGO)
 
     li = Lichess()
 
     if args.upgrade:
         if li.title == "BOT":
-            logging.warning("Account is already a BOT.")
+            logger.warning("Account is already a BOT.")
         else:
             if await li.upgrade_account():
-                logging.info("BOT upgrade successful.")
+                logger.info("BOT upgrade successful.")
             else:
-                logging.info("BOT upgrade failed.")
+                logger.info("BOT upgrade failed.")
         return
 
     if li.title != "BOT":
-        logging.error("asyncLio-bot can only be used by BOT accounts.")
+        logger.error("asyncLio-bot can only be used by BOT accounts.")
         return
 
-    logging.info(f"Logged in as {li.title} {li.username}")
+    logger.info(f"Logged in as {li.title} {li.username}")
 
     event_handler = EventHandler(li)
     await event_handler.run()

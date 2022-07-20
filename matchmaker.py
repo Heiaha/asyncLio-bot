@@ -1,6 +1,7 @@
-import logging
 import random
 from typing import Any
+
+from loguru import logger
 
 from config import CONFIG
 from enums import PerfType, Variant
@@ -79,7 +80,7 @@ class Matchmaker:
         for bot in bots:
 
             if self._should_challenge(bot, perf_type):
-                logging.info(
+                logger.info(
                     f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds/60}+{tc_increment}."
                 )
 

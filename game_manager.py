@@ -1,7 +1,8 @@
 import asyncio
-import logging
 from collections import deque
 from typing import NoReturn
+
+from loguru import logger
 
 from config import CONFIG
 from game import Game
@@ -48,8 +49,8 @@ class GameManager:
         self.current_games[game_id] = game
 
         self.event.set()
-        logging.info(f"Game {game_id} starting against {opponent}.")
-        logging.info(f"Current Processes: {len(self.current_games)}")
+        logger.info(f"Game {game_id} starting against {opponent}.")
+        logger.info(f"Current Processes: {len(self.current_games)}")
 
     async def on_game_finish(self, event: dict) -> None:
         if (game_id := event["game"]["id"]) in self.current_games:
@@ -59,10 +60,10 @@ class GameManager:
             try:
                 await game.task
             except Exception as e:
-                logging.error(e)
+                logger.error(e)
 
         self.event.set()
-        logging.info(f"Current Processes: {len(self.current_games)}")
+        logger.info(f"Current Processes: {len(self.current_games)}")
 
     async def on_challenge(self, event: dict) -> None:
         challenge_id = event["challenge"]["id"]
@@ -70,7 +71,7 @@ class GameManager:
         if challenger_name == self.li.username:
             return
 
-        logging.info(f"ID: {challenge_id}\tChallenger: {challenger_name}")
+        logger.info(f"ID: {challenge_id}\tChallenger: {challenger_name}")
         if self._should_accept(event):
             self.challenge_queue.append(challenge_id)
             self.event.set()

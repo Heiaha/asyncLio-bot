@@ -1,11 +1,11 @@
 import asyncio
-import logging
 import time
 
 import chess
 import chess.engine
 import chess.polyglot
 import chess.variant
+from loguru import logger
 
 from config import CONFIG
 from enums import GameStatus, GameEvent, Variant
@@ -129,15 +129,13 @@ class Game:
         if move := self._get_book_move():
             message = f"{self.id} -- Book: {self.board.san(move)}"
         else:
-            logging.info(
-                f"Searching for move in game {self.id} from {self.board.fen()}"
-            )
+            logger.info(f"Searching for move in game {self.id} from {self.board.fen()}")
             move, info = await self._get_engine_move()
             message = self._format_engine_move_message(move, info)
             resign = self._should_resign()
             offer_draw = self._should_draw()
 
-        logging.info(message)
+        logger.info(message)
         if resign:
             await self.li.resign_game(self.id)
         else:
@@ -259,7 +257,7 @@ class Game:
 
                 if self.is_game_over():
                     message = self._format_result_message(event.get("winner"))
-                    logging.info(message)
+                    logger.info(message)
                     break
 
                 if self._is_our_turn() and updated:
@@ -280,13 +278,13 @@ class Game:
                         self.status = GameStatus.ABORTED
                         break
 
-        # It's possible we've reached this stage because the server has 502'd
+        # It's possible we've reached this stage because the server has > 500'd
         # and the iterator has unexpectedly closed without setting the status to be in a finished state.
         # If that's true we need to set the game to be over, so that it can be cleaned up by the game manager.
         if not self.is_game_over():
             self.status = GameStatus.UNKNOWN_FINISH
 
-        logging.info("Quitting engine.")
+        logger.info("Quitting engine.")
         await self.engine.quit()
 
     def is_game_over(self) -> bool:
