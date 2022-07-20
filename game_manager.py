@@ -22,7 +22,10 @@ class GameManager:
         while True:
             try:
                 await asyncio.wait_for(
-                    self.event.wait(), timeout=CONFIG["matchmaking"]["timeout"]
+                    self.event.wait(),
+                    timeout=CONFIG["matchmaking"]["timeout"]
+                    if CONFIG["matchmaking"]["enabled"]
+                    else None,
                 )
             except asyncio.TimeoutError:
                 if self._is_under_concurrency_limit():
