@@ -8,7 +8,7 @@ import chess.variant
 from loguru import logger
 
 from config import CONFIG
-from enums import GameStatus, GameEvent, Variant
+from enums import GameStatus, GameEvent, Variant, BookSelection
 from lichess import Lichess
 
 
@@ -88,11 +88,17 @@ class Game:
         else:
             return
 
+        selection = BookSelection(CONFIG["books"]["selection"])
         board = self.board.copy()
         for book in books:
             with chess.polyglot.open_reader(book) as reader:
                 try:
-                    move = reader.weighted_choice(board).move
+                    if selection == BookSelection.WEIGHTED_RANDOM:
+                        move = reader.weighted_choice(board).move
+                    elif selection == BookSelection.UNIFORM_RANDOM:
+                        move = reader.choice(board).move
+                    elif selection == BookSelection.BEST_MOVE:
+                        move = reader.find(board).move
                     board.push(move)
                     if not board.is_repetition(count=2):
                         return move

@@ -10,7 +10,7 @@ engine:
 
 books:
   enabled: false
-  selection: weighted_random
+  selection: weighted_random # One from weighted_random, uniform_random, or best_move.
   depth: 10
   standard:                  # List of book file paths for variant standard. Add additional books or variants.
     - path/to/book

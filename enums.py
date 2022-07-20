@@ -79,3 +79,9 @@ class PerfType(Enum):
         if variant in (Variant.STANDARD, Variant.FROM_POSITION):
             raise ValueError(f"{variant} not supported as a performance type.")
         return cls(variant.value)
+
+
+class BookSelection(Enum):
+    WEIGHTED_RANDOM = "weighted_random"
+    UNIFORM_RANDOM = "uniform_random"
+    BEST_MOVE = "best_move"
