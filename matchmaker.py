@@ -87,3 +87,5 @@ class Matchmaker:
                 # Send challenge request.
                 await self.li.create_challenge(bot.name, tc_seconds, tc_increment)
                 return
+
+        logger.warning("Could not find any bot to challenge.")

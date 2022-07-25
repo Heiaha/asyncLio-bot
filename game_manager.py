@@ -105,8 +105,8 @@ class GameManager:
         if variant not in allowed_variants:
             return False
 
-        increment = event["challenge"]["timeControl"].get("increment")
-        initial = event["challenge"]["timeControl"].get("limit")
+        increment = event["challenge"]["timeControl"].get("increment", 0)
+        initial = event["challenge"]["timeControl"].get("limit", 0)
         speed = event["challenge"]["speed"]
 
         if speed not in allowed_tcs:

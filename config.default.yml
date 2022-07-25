@@ -25,8 +25,8 @@ challenge:                   # Incoming challenges.
   enabled: false             # Flag for controlling if any challenges get accepted. Overrides all other flags.
   max_increment: 60          # Maximum amount of increment to accept a challenge. The max is 180. Set to 0 for no increment.
   min_increment: 0           # Minimum amount of increment to accept a challenge.
-  max_base: 3600             # Maximum amount of base time to accept a challenge. The max is 315360000 (10 years).
-  min_base: 0                # Minimum amount of base time to accept a challenge.
+  max_initial: 3600             # Maximum amount of base time to accept a challenge. The max is 315360000 (10 years).
+  min_initial: 0                # Minimum amount of base time to accept a challenge.
   variants:                  # Chess variants to accept (https://lichess.org/variant).
     - standard
 #    - chess960

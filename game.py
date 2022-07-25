@@ -130,8 +130,8 @@ class Game:
         raise RuntimeError("Engine could not make a move.")
 
     async def _make_move(self) -> None:
-        offer_draw = False
         resign = False
+        offer_draw = False
         if move := self._get_book_move():
             message = f"{self.id} -- Book: {self.board.san(move)}"
         else:
@@ -141,10 +141,11 @@ class Game:
             resign = self._should_resign()
             offer_draw = self._should_draw()
 
-        logger.info(message)
         if resign:
+            logger.info(f"Resigning game {self.id}.")
             await self.li.resign_game(self.id)
         else:
+            logger.info(message)
             await self.li.make_move(self.id, move, offer_draw=offer_draw)
 
     def _should_draw(self) -> bool:
