@@ -100,6 +100,7 @@ class Lichess:
         if response.status_code == 200:
             return True
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             return False
 
     async def decline_challenge(self, challenge_id: str) -> bool:
@@ -107,6 +108,7 @@ class Lichess:
         if response.status_code == 200:
             return True
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             return False
 
     async def create_challenge(
@@ -126,6 +128,7 @@ class Lichess:
         if response.status_code == 200:
             return response.json()["challenge"]["id"]
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             return ""
 
     async def cancel_challenge(self, challenge_id: str) -> bool:
@@ -133,6 +136,7 @@ class Lichess:
         if response.status_code == 200:
             return True
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             return False
 
     async def abort_game(self, game_id: str) -> bool:
@@ -140,6 +144,7 @@ class Lichess:
         if response.status_code == 200:
             return True
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             return False
 
     async def resign_game(self, game_id: str) -> bool:
@@ -147,6 +152,7 @@ class Lichess:
         if response.status_code == 200:
             return True
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             return False
 
     async def get_open_challenges(self) -> dict:
@@ -154,6 +160,7 @@ class Lichess:
         if response.status_code == 200:
             return response.json()
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             return {}
 
     async def get_ongoing_games(self) -> list[str]:
@@ -161,6 +168,7 @@ class Lichess:
         if response.status_code == 200:
             return [game_info["gameId"] for game_info in response.json()["nowPlaying"]]
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             return []
 
     async def make_move(
@@ -173,6 +181,7 @@ class Lichess:
         if response.status_code == 200:
             return True
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             return False
 
     async def upgrade_account(self) -> bool:
@@ -180,4 +189,5 @@ class Lichess:
         if response.status_code == 200:
             return True
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             return False
