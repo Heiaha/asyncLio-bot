@@ -1,9 +1,11 @@
 import argparse
 import asyncio
+import sys
 from argparse import ArgumentParser
 from typing import NoReturn
 
 import chess.engine
+import loguru
 from loguru import logger
 
 from event_handler import EventHandler
@@ -20,8 +22,12 @@ LOGO = """
 
 
 async def main(args: argparse.Namespace) -> NoReturn:
+    log_level = "DEBUG" if args.verbose else "INFO"
+
+    logger.remove()
+    logger.add(sys.stderr, level=log_level)
     if args.log:
-        logger.add(args.log)
+        logger.add(args.log, level=log_level)
 
     logger.info(LOGO)
 
@@ -53,6 +59,9 @@ if __name__ == "__main__":
         "--upgrade", "-u", action="store_true", help="Upgrade account to BOT account."
     )
     parser.add_argument("--log", "-l", type=str, help="Log file.")
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Make output more verbose."
+    )
 
     asyncio.set_event_loop_policy(chess.engine.EventLoopPolicy())
     asyncio.run(main(parser.parse_args()))

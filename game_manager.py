@@ -61,7 +61,7 @@ class GameManager:
 
             # await task here to return and output any potential errors, but don't let it close the event loop
             try:
-                await game.task
+                await game.loop_task
             except Exception as e:
                 logger.error(e)
 

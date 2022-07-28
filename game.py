@@ -1,5 +1,6 @@
 import asyncio
 import time
+import sys
 
 import chess
 import chess.engine
@@ -27,7 +28,8 @@ class Game:
         self.board: chess.Board = self._setup_board()
 
         # attributes to be set up asynchronously or after the game starts
-        self.task: asyncio.Task | None = None
+        self.loop_task: asyncio.Task | None = None
+        self.move_task: asyncio.Task | None = None
         self.start_time: float | None = None
         self.white_time: int | None = None
         self.black_time: int | None = None
@@ -36,9 +38,14 @@ class Game:
         self.engine: chess.engine.UciProtocol | None = None
 
     async def _setup(self) -> None:
-        transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
-        if options := CONFIG["engine"].get("uci_options"):
-            await engine.configure(options)
+        logger.debug(f"Starting engine {CONFIG['engine']['path']}.")
+        try:
+            transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
+            if options := CONFIG["engine"].get("uci_options"):
+                await engine.configure(options)
+        except Exception as e:
+            logger.critical(e)
+            sys.exit()
         self.engine = engine
         self.start_time = time.monotonic()
 
@@ -140,6 +147,9 @@ class Game:
             message = self._format_engine_move_message(move, info)
             resign = self._should_resign()
             offer_draw = self._should_draw()
+
+        if self.is_game_over():
+            return
 
         if resign:
             logger.info(f"Resigning game {self.id}.")
@@ -257,7 +267,7 @@ class Game:
             if event_type == GameEvent.GAME_FULL:
                 self._update(event["state"])
                 if self._is_our_turn():
-                    await self._make_move()
+                    self.move_task = asyncio.create_task(self._make_move())
 
             elif event_type == GameEvent.GAME_STATE:
                 updated = self._update(event)
@@ -268,7 +278,7 @@ class Game:
                     break
 
                 if self._is_our_turn() and updated:
-                    await self._make_move()
+                    self.move_task = asyncio.create_task(self._make_move())
 
             elif event_type == GameEvent.PING:
                 if (
@@ -291,11 +301,14 @@ class Game:
         if not self.is_game_over():
             self.status = GameStatus.UNKNOWN_FINISH
 
-        logger.info("Quitting engine.")
+        if self.move_task and not self.move_task.done():
+            self.move_task.cancel()
+
+        logger.debug("Quitting engine.")
         await self.engine.quit()
 
     def is_game_over(self) -> bool:
         return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
 
     def play(self) -> None:
-        self.task = asyncio.create_task(self._play())
+        self.loop_task = asyncio.create_task(self._play())

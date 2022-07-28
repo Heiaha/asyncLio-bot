@@ -4,6 +4,7 @@ from typing import AsyncIterator
 import backoff
 import chess
 import httpx
+from loguru import logger
 
 from config import CONFIG
 
@@ -18,13 +19,15 @@ class Lichess:
         self.title = user_info.get("title", "")
         headers["User-Agent"] = f"asyncLio-bot user:{self.username}"
         self.client = httpx.AsyncClient(
-            base_url="https://lichess.org",
-            headers=headers,
+            base_url="https://lichess.org", headers=headers,
         )
 
-    @backoff.on_exception(backoff.expo, httpx.HTTPStatusError)
+    @backoff.on_exception(backoff.expo, httpx.HTTPStatusError, max_time=300)
     async def get(self, endpoint: str, **kwargs) -> httpx.Response:
         response = await self.client.get(endpoint, **kwargs)
+        logger.debug(
+            f"Endpoint: {endpoint}, kwargs: {kwargs}, code: {response.status_code}, text: {response.text}"
+        )
         if response.status_code < 500:
             return response
         else:
@@ -33,6 +36,9 @@ class Lichess:
     @backoff.on_exception(backoff.expo, httpx.HTTPStatusError, max_time=300)
     async def post(self, endpoint: str, **kwargs) -> httpx.Response:
         response = await self.client.post(endpoint, **kwargs)
+        logger.debug(
+            f"Endpoint: {endpoint}, kwargs: {kwargs}, code: {response.status_code}, text: {response.text}"
+        )
         if response.status_code < 500:
             return response
         else:
@@ -48,30 +54,32 @@ class Lichess:
                     async for line in response.aiter_lines():
                         if line.strip():
                             event = json.loads(line)
+                            logger.debug(f"Event: {event}")
                         else:
                             event = {"type": "ping"}
                         yield event
                 return
-            except httpx.HTTPStatusError:
+            except httpx.HTTPStatusError as e:
+                logger.error(e)
                 pass
 
     async def watch_game_stream(self, game_id: str) -> AsyncIterator[dict]:
         while True:
             try:
                 async with self.client.stream(
-                    "GET",
-                    f"/api/bot/game/stream/{game_id}",
-                    timeout=None,
+                    "GET", f"/api/bot/game/stream/{game_id}", timeout=None,
                 ) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():
                         if line.strip():
                             event = json.loads(line)
+                            logger.debug(f"Game event: {event}")
                         else:
                             event = {"type": "ping"}
                         yield event
                 return
-            except httpx.HTTPStatusError:
+            except httpx.HTTPStatusError as e:
+                logger.error(e)
                 if game_id not in await self.get_ongoing_games():
                     return
 
@@ -83,7 +91,7 @@ class Lichess:
                     bot = json.loads(line)
                     yield bot
         except httpx.HTTPStatusError as e:
-            return
+            logger.error(e)
 
     async def accept_challenge(self, challenge_id: str) -> bool:
         response = await self.post(f"/api/challenge/{challenge_id}/accept")
