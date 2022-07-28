@@ -22,29 +22,25 @@ class Lichess:
             base_url="https://lichess.org", headers=headers,
         )
 
-    @backoff.on_exception(backoff.expo, httpx.HTTPStatusError, max_time=300)
+    @backoff.on_predicate(
+        backoff.expo, lambda response: response.status_code >= 500, max_time=300
+    )
     async def get(self, endpoint: str, **kwargs) -> httpx.Response:
         response = await self.client.get(endpoint, **kwargs)
         logger.debug(
             f"Endpoint: {endpoint}, kwargs: {kwargs}, code: {response.status_code}, text: {response.text}"
         )
-        if response.status_code < 500:
-            return response
-        else:
-            logger.error(f"Status code {response.status_code}: {response.text}")
-            response.raise_for_status()
+        return response
 
-    @backoff.on_exception(backoff.expo, httpx.HTTPStatusError, max_time=300)
+    @backoff.on_predicate(
+        backoff.expo, lambda response: response.status_code >= 500, max_time=300
+    )
     async def post(self, endpoint: str, **kwargs) -> httpx.Response:
         response = await self.client.post(endpoint, **kwargs)
         logger.debug(
             f"Endpoint: {endpoint}, kwargs: {kwargs}, code: {response.status_code}, text: {response.text}"
         )
-        if response.status_code < 500:
-            return response
-        else:
-            logger.error(f"Status code {response.status_code}: {response.text}")
-            response.raise_for_status()
+        return response
 
     async def watch_event_stream(self) -> AsyncIterator[dict]:
         while True:
@@ -61,7 +57,7 @@ class Lichess:
                             event = {"type": "ping"}
                         yield event
                 return
-            except httpx.HTTPStatusError as e:
+            except Exception as e:
                 logger.error(e)
                 pass
 
@@ -80,7 +76,7 @@ class Lichess:
                             event = {"type": "ping"}
                         yield event
                 return
-            except httpx.HTTPStatusError as e:
+            except Exception as e:
                 logger.error(e)
                 if game_id not in await self.get_ongoing_games():
                     return
