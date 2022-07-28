@@ -31,6 +31,7 @@ class Lichess:
         if response.status_code < 500:
             return response
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             response.raise_for_status()
 
     @backoff.on_exception(backoff.expo, httpx.HTTPStatusError, max_time=300)
@@ -42,6 +43,7 @@ class Lichess:
         if response.status_code < 500:
             return response
         else:
+            logger.error(f"Status code {response.status_code}: {response.text}")
             response.raise_for_status()
 
     async def watch_event_stream(self) -> AsyncIterator[dict]:
