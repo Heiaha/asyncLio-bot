@@ -23,7 +23,12 @@ class Lichess:
         )
 
     @backoff.on_predicate(
-        backoff.expo, lambda response: response.status_code >= 500, max_time=300
+        backoff.expo,
+        lambda response: response.status_code >= 500,
+        max_time=300,
+        on_backoff=lambda details: logger.warning(
+            f"Backing off get with args: {details['args']}, kwargs: {details['kwargs']}, status code: {details['value'].status_code}."
+        ),
     )
     async def get(self, endpoint: str, **kwargs) -> httpx.Response:
         response = await self.client.get(endpoint, **kwargs)
@@ -33,7 +38,12 @@ class Lichess:
         return response
 
     @backoff.on_predicate(
-        backoff.expo, lambda response: response.status_code >= 500, max_time=300
+        backoff.expo,
+        lambda response: response.status_code >= 500,
+        max_time=300,
+        on_backoff=lambda details: logger.warning(
+            f"Backing off post with args: {details['args']}, kwargs: {details['kwargs']}, status code: {details['value'].status_code}."
+        ),
     )
     async def post(self, endpoint: str, **kwargs) -> httpx.Response:
         response = await self.client.post(endpoint, **kwargs)
