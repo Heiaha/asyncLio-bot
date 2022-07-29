@@ -46,7 +46,7 @@ async def main(args: argparse.Namespace) -> NoReturn:
         logger.error("asyncLio-bot can only be used by BOT accounts.")
         return
 
-    logger.info(f"Logged in as {li.title} {li.username}")
+    logger.info(f"Logged in as {li.title} {li.username}.")
 
     await GameManager(li).event_loop()
 

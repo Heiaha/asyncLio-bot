@@ -37,7 +37,7 @@ class Game:
         self.black_inc: int | None = None
         self.engine: chess.engine.UciProtocol | None = None
 
-    async def setup(self) -> None:
+    async def seloup(self) -> None:
         logger.debug(f"Starting engine {CONFIG['engine']['path']}.")
         try:
             transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
@@ -142,7 +142,7 @@ class Game:
         if move := self.get_book_move():
             message = f"{self.id} -- Book: {self.board.san(move)}"
         else:
-            logger.info(f"{self.id} -- Searching for move from {self.board.fen()}")
+            logger.info(f"{self.id} -- Searching for move from {self.board.fen()}.")
             move, info = await self.get_engine_move()
             message = self.format_engine_move_message(move, info)
             resign = self.should_resign()
