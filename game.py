@@ -37,7 +37,7 @@ class Game:
         self.black_inc: int | None = None
         self.engine: chess.engine.UciProtocol | None = None
 
-    async def seloup(self) -> None:
+    async def setup(self) -> None:
         logger.debug(f"Starting engine {CONFIG['engine']['path']}.")
         try:
             transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
