@@ -25,7 +25,7 @@ class Game:
         self.variant: Variant = Variant(event["game"]["variant"]["key"])
         self.status: GameStatus = GameStatus.CREATED
         self.scores: list[chess.engine.PovScore] = []
-        self.board: chess.Board = self._setup_board()
+        self.board: chess.Board = self.setup_board()
 
         # attributes to be set up asynchronously or after the game starts
         self.loop_task: asyncio.Task | None = None
@@ -37,7 +37,7 @@ class Game:
         self.black_inc: int | None = None
         self.engine: chess.engine.UciProtocol | None = None
 
-    async def _setup(self) -> None:
+    async def setup(self) -> None:
         logger.debug(f"Starting engine {CONFIG['engine']['path']}.")
         try:
             transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
@@ -49,21 +49,21 @@ class Game:
         self.engine = engine
         self.start_time = time.monotonic()
 
-    def _update(self, event: dict) -> bool:
+    def update(self, event: dict) -> bool:
         self.status = GameStatus(event["status"])
 
         moves = event["moves"].split()
         if len(moves) <= len(self.board.move_stack):
             return False
 
-        self.board = self._setup_board(moves)
+        self.board = self.setup_board(moves)
         self.white_time = event["wtime"]
         self.black_time = event["btime"]
         self.white_inc = event["winc"]
         self.black_inc = event["binc"]
         return True
 
-    def _setup_board(self, moves: list[str] | None = None) -> chess.Board:
+    def setup_board(self, moves: list[str] | None = None) -> chess.Board:
         if self.variant == Variant.CHESS960:
             board = chess.Board(self.initial_fen, chess960=True)
         elif self.variant == Variant.FROM_POSITION:
@@ -76,10 +76,10 @@ class Game:
                 board.push_uci(move)
         return board
 
-    def _is_our_turn(self) -> bool:
+    def is_our_turn(self) -> bool:
         return self.color == self.board.turn
 
-    def _get_book_move(self) -> chess.Move | None:
+    def get_book_move(self) -> chess.Move | None:
         if not CONFIG["books"]["enabled"]:
             return
 
@@ -113,7 +113,7 @@ class Game:
                 except IndexError:
                     pass
 
-    async def _get_engine_move(self) -> tuple[chess.Move, chess.engine.InfoDict]:
+    async def get_engine_move(self) -> tuple[chess.Move, chess.engine.InfoDict]:
         if len(self.board.move_stack) < 2:
             limit = chess.engine.Limit(time=10)
         else:
@@ -136,17 +136,17 @@ class Game:
 
         raise RuntimeError("Engine could not make a move.")
 
-    async def _make_move(self) -> None:
+    async def make_move(self) -> None:
         resign = False
         offer_draw = False
-        if move := self._get_book_move():
+        if move := self.get_book_move():
             message = f"{self.id} -- Book: {self.board.san(move)}"
         else:
             logger.info(f"{self.id} -- Searching for move from {self.board.fen()}")
-            move, info = await self._get_engine_move()
-            message = self._format_engine_move_message(move, info)
-            resign = self._should_resign()
-            offer_draw = self._should_draw()
+            move, info = await self.get_engine_move()
+            message = self.format_engine_move_message(move, info)
+            resign = self.should_resign()
+            offer_draw = self.should_draw()
 
         if self.is_game_over():
             return
@@ -158,7 +158,7 @@ class Game:
             logger.info(message)
             await self.li.make_move(self.id, move, offer_draw=offer_draw)
 
-    def _should_draw(self) -> bool:
+    def should_draw(self) -> bool:
         if not CONFIG["draw"]["enabled"]:
             return False
 
@@ -173,7 +173,7 @@ class Game:
             for score in self.scores[-CONFIG["draw"]["moves"] :]
         )
 
-    def _should_resign(self) -> bool:
+    def should_resign(self) -> bool:
         if not CONFIG["resign"]["enabled"]:
             return False
 
@@ -185,7 +185,7 @@ class Game:
             for score in self.scores[-CONFIG["resign"]["moves"] :]
         )
 
-    def _format_engine_move_message(
+    def format_engine_move_message(
         self, move: chess.Move, info: chess.engine.InfoDict
     ) -> str:
         message = f"{self.id} -- Engine: "
@@ -220,7 +220,7 @@ class Game:
 
         return message
 
-    def _format_result_message(self, winner_str: str | None) -> str:
+    def format_result_message(self, winner_str: str | None) -> str:
 
         if winner_str == "white":
             winner = chess.WHITE
@@ -260,30 +260,30 @@ class Game:
 
     async def _play(self):
         abort_count = 0
-        await self._setup()
+        await self.setup()
         async for event in self.li.watch_game_stream(self.id):
             event_type = GameEvent(event["type"])
 
             if event_type == GameEvent.GAME_FULL:
-                self._update(event["state"])
-                if self._is_our_turn():
-                    self.move_task = asyncio.create_task(self._make_move())
+                self.update(event["state"])
+                if self.is_our_turn():
+                    self.move_task = asyncio.create_task(self.make_move())
 
             elif event_type == GameEvent.GAME_STATE:
-                updated = self._update(event)
+                updated = self.update(event)
 
                 if self.is_game_over():
-                    message = self._format_result_message(event.get("winner"))
+                    message = self.format_result_message(event.get("winner"))
                     logger.info(message)
                     break
 
-                if self._is_our_turn() and updated:
-                    self.move_task = asyncio.create_task(self._make_move())
+                if self.is_our_turn() and updated:
+                    self.move_task = asyncio.create_task(self.make_move())
 
             elif event_type == GameEvent.PING:
                 if (
                     len(self.board.move_stack) < 2
-                    and not self._is_our_turn()
+                    and not self.is_our_turn()
                     and time.monotonic() > self.start_time + CONFIG["abort_time"]
                 ):
                     await self.li.abort_game(self.id)

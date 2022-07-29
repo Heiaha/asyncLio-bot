@@ -5,10 +5,9 @@ from argparse import ArgumentParser
 from typing import NoReturn
 
 import chess.engine
-import loguru
 from loguru import logger
 
-from event_handler import EventHandler
+from game_manager import GameManager
 from lichess import Lichess
 
 LOGO = """
@@ -49,8 +48,7 @@ async def main(args: argparse.Namespace) -> NoReturn:
 
     logger.info(f"Logged in as {li.title} {li.username}")
 
-    event_handler = EventHandler(li)
-    await event_handler.run()
+    await GameManager(li).event_loop()
 
 
 if __name__ == "__main__":

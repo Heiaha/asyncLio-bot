@@ -5,6 +5,7 @@ from typing import NoReturn
 from loguru import logger
 
 from config import CONFIG
+from enums import Event
 from game import Game
 from lichess import Lichess
 from matchmaker import Matchmaker
@@ -18,7 +19,27 @@ class GameManager:
         self.challenge_queue: deque[str] = deque()
         self.event: asyncio.Event = asyncio.Event()
 
-    async def run(self) -> NoReturn:
+    async def event_loop(self) -> NoReturn:
+        asyncio.create_task(self.challenge_loop())
+        async for event in self.li.watch_event_stream():
+            event_type = Event(event["type"])
+
+            if event_type == Event.PING:
+                self.clean_games()
+
+            elif event_type == Event.GAME_START:
+                await self.on_game_start(event)
+
+            elif event_type == Event.GAME_FINISH:
+                await self.on_game_finish(event)
+
+            elif event_type == Event.CHALLENGE:
+                await self.on_challenge(event)
+
+            elif event_type == Event.CHALLENGE_CANCELED:
+                self.on_challenge_cancelled(event)
+
+    async def challenge_loop(self) -> NoReturn:
         while True:
             try:
                 await asyncio.wait_for(
@@ -28,14 +49,17 @@ class GameManager:
                     else None,
                 )
             except asyncio.TimeoutError:
-                if self._is_under_concurrency_limit():
+                if self.is_under_concurrency_limit():
                     await self.matchmaker.challenge()
                 continue
 
             self.event.clear()
 
-            while self._is_under_concurrency_limit() and self.challenge_queue:
+            while self.is_under_concurrency_limit() and self.challenge_queue:
                 await self.li.accept_challenge(self.challenge_queue.popleft())
+
+    async def on_ping(self):
+        self.clean_games()
 
     async def on_game_start(self, event: dict) -> None:
         game_id = event["game"]["id"]
@@ -43,7 +67,7 @@ class GameManager:
 
         # If this is an extremely late acceptance of a challenge we issued earlier
         # that would bring us over our concurrency limit, abort it.
-        if not self._is_under_concurrency_limit():
+        if not self.is_under_concurrency_limit():
             await self.li.abort_game(game_id)
             return
 
@@ -75,7 +99,7 @@ class GameManager:
             return
 
         logger.info(f"ID: {challenge_id}\tChallenger: {challenger_name}")
-        if self._should_accept(event):
+        if self.should_accept(event):
             self.challenge_queue.append(challenge_id)
             self.event.set()
         else:
@@ -85,11 +109,11 @@ class GameManager:
         if (challenge_id := event["challenge"]["id"]) in self.challenge_queue:
             self.challenge_queue.remove(challenge_id)
 
-    def _is_under_concurrency_limit(self) -> bool:
+    def is_under_concurrency_limit(self) -> bool:
         return len(self.current_games) < CONFIG["concurrency"]
 
     @staticmethod
-    def _should_accept(event: dict) -> bool:
+    def should_accept(event: dict) -> bool:
 
         if not CONFIG["challenge"]["enabled"]:
             return False
