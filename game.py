@@ -142,7 +142,7 @@ class Game:
         if move := self._get_book_move():
             message = f"{self.id} -- Book: {self.board.san(move)}"
         else:
-            logger.info(f"Searching for move in game {self.id} from {self.board.fen()}")
+            logger.info(f"{self.id} -- Searching for move from {self.board.fen()}")
             move, info = await self._get_engine_move()
             message = self._format_engine_move_message(move, info)
             resign = self._should_resign()
