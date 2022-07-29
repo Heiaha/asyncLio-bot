@@ -77,7 +77,7 @@ class GameManager:
 
         self.event.set()
         logger.info(f"Game {game_id} starting against {opponent}.")
-        logger.info(f"Current Processes: {len(self.current_games)}")
+        logger.info(f"Current Processes: {len(self.current_games)}.")
 
     async def on_game_finish(self, event: dict) -> None:
         if (game_id := event["game"]["id"]) in self.current_games:
@@ -90,7 +90,7 @@ class GameManager:
                 logger.error(e)
 
         self.event.set()
-        logger.info(f"Current Processes: {len(self.current_games)}")
+        logger.info(f"Current Processes: {len(self.current_games)}.")
 
     async def on_challenge(self, event: dict) -> None:
         challenge_id = event["challenge"]["id"]
@@ -98,7 +98,7 @@ class GameManager:
         if challenger_name == self.li.username:
             return
 
-        logger.info(f"ID: {challenge_id}\tChallenger: {challenger_name}")
+        logger.info(f"{challenge_id} -- Challenger: {challenger_name}.")
         if self.should_accept(event):
             self.challenge_queue.append(challenge_id)
             self.event.set()
@@ -106,7 +106,10 @@ class GameManager:
             await self.li.decline_challenge(challenge_id)
 
     def on_challenge_cancelled(self, event: dict) -> None:
-        if (challenge_id := event["challenge"]["id"]) in self.challenge_queue:
+        challenge_id = event["challenge"]["id"]
+        challenger_name = event["challenge"]["challenger"]["name"]
+        if challenge_id in self.challenge_queue:
+            logger.info(f"{challenge_id} -- Challenge from {challenger_name} removed.")
             self.challenge_queue.remove(challenge_id)
 
     def is_under_concurrency_limit(self) -> bool:
