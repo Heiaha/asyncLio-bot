@@ -5,7 +5,7 @@ from typing import NoReturn
 from loguru import logger
 
 from config import CONFIG
-from enums import Event
+from enums import Event, DeclineReason
 from game import Game
 from lichess import Lichess
 from matchmaker import Matchmaker
@@ -44,7 +44,7 @@ class GameManager:
             try:
                 await asyncio.wait_for(
                     self.event.wait(),
-                    timeout=CONFIG["matchmaking"]["timeout"]
+                    timeout=CONFIG["matchmaking"]["timeout"] * 60
                     if CONFIG["matchmaking"]["enabled"]
                     else None,
                 )
@@ -99,11 +99,14 @@ class GameManager:
             return
 
         logger.info(f"{challenge_id} -- Challenger: {challenger_name}.")
-        if self.should_accept(event):
+        if decline_reason := DeclineReason.from_event(event):
+            logger.info(
+                f"Declining challenge from {challenger_name} for reason: {decline_reason}."
+            )
+            await self.li.decline_challenge(challenge_id, reason=decline_reason)
+        else:
             self.challenge_queue.append(challenge_id)
             self.event.set()
-        else:
-            await self.li.decline_challenge(challenge_id)
 
     def on_challenge_cancelled(self, event: dict) -> None:
         challenge_id = event["challenge"]["id"]
@@ -114,38 +117,6 @@ class GameManager:
 
     def is_under_concurrency_limit(self) -> bool:
         return len(self.current_games) < CONFIG["concurrency"]
-
-    @staticmethod
-    def should_accept(event: dict) -> bool:
-
-        if not CONFIG["challenge"]["enabled"]:
-            return False
-
-        allowed_variants = CONFIG["challenge"]["variants"]
-        allowed_tcs = CONFIG["challenge"]["time_controls"]
-        min_increment = CONFIG["challenge"].get("min_increment", 0)
-        max_increment = CONFIG["challenge"].get("max_increment", 180)
-        min_initial = CONFIG["challenge"].get("min_initial", 0)
-        max_initial = CONFIG["challenge"].get("max_initial", 315360000)
-
-        variant = event["challenge"]["variant"]["key"]
-        if variant not in allowed_variants:
-            return False
-
-        increment = event["challenge"]["timeControl"].get("increment", 0)
-        initial = event["challenge"]["timeControl"].get("limit", 0)
-        speed = event["challenge"]["speed"]
-
-        if speed not in allowed_tcs:
-            return False
-
-        if not (min_initial <= initial <= max_initial):
-            return False
-
-        if not (min_increment <= increment <= max_increment):
-            return False
-
-        return True
 
     def clean_games(self) -> None:
         # Sometimes the lichess game loop seems to close without the event loop sending a "gameFinish" event

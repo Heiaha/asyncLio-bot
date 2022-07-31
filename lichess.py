@@ -6,6 +6,7 @@ import chess
 import httpx
 from loguru import logger
 
+from enums import DeclineReason
 from config import CONFIG
 
 
@@ -109,8 +110,12 @@ class Lichess:
             logger.error(f"Status code {response.status_code}: {response.text}")
             return False
 
-    async def decline_challenge(self, challenge_id: str) -> bool:
-        response = await self.post(f"/api/challenge/{challenge_id}/decline")
+    async def decline_challenge(
+        self, challenge_id: str, *, reason: DeclineReason = DeclineReason.GENERIC
+    ) -> bool:
+        response = await self.post(
+            f"/api/challenge/{challenge_id}/decline", data={"reason": reason.value}
+        )
         if response.status_code == 200:
             return True
         else:

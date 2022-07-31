@@ -1,4 +1,7 @@
+import re
 from enum import Enum
+
+from config import CONFIG
 
 
 class GameStatus(Enum):
@@ -85,3 +88,64 @@ class BookSelection(Enum):
     WEIGHTED_RANDOM = "weighted_random"
     UNIFORM_RANDOM = "uniform_random"
     BEST_MOVE = "best_move"
+
+
+class DeclineReason(Enum):
+    GENERIC = "generic"
+    LATER = "later"
+    TOO_FAST = "tooFast"
+    TOO_SLOW = "tooSlow"
+    TIME_CONTROL = "timeControl"
+    RATED = "rated"
+    CASUAL = "casual"
+    STANDARD = "standard"
+    VARIANT = "variant"
+    NO_BOT = "noBot"
+    ONLY_BOT = "onlyBot"
+
+    def __str__(self):
+        return re.sub(r"(\w)([A-Z])", r"\1 \2", self.value).lower()
+
+    @classmethod
+    def from_event(cls, event: dict) -> "DeclineReason":
+        if not CONFIG["challenge"]["enabled"]:
+            return cls.GENERIC
+
+        allowed_modes = CONFIG["challenge"]["modes"]
+        allowed_opponents = CONFIG["challenge"]["opponents"]
+        allowed_variants = CONFIG["challenge"]["variants"]
+        allowed_tcs = CONFIG["challenge"]["time_controls"]
+        min_increment = CONFIG["challenge"].get("min_increment", 0)
+        max_increment = CONFIG["challenge"].get("max_increment", 180)
+        min_initial = CONFIG["challenge"].get("min_initial", 0)
+        max_initial = CONFIG["challenge"].get("max_initial", 315360000)
+
+        is_rated = event["challenge"]["rated"]
+        if is_rated and "rated" not in allowed_modes:
+            return cls.CASUAL
+
+        if not is_rated and "casual" not in allowed_modes:
+            return cls.RATED
+
+        variant = event["challenge"]["variant"]["key"]
+        if variant not in allowed_variants:
+            return cls.VARIANT
+
+        is_bot = event["challenge"]["challenger"]["title"] == "BOT"
+        if is_bot and "bot" not in allowed_opponents:
+            return cls.NO_BOT
+
+        if not is_bot and "human" not in allowed_opponents:
+            return cls.ONLY_BOT
+
+        increment = event["challenge"]["timeControl"].get("increment", 0)
+        initial = event["challenge"]["timeControl"].get("limit", 0)
+        speed = event["challenge"]["speed"]
+        if speed not in allowed_tcs:
+            return cls.TIME_CONTROL
+
+        if initial < min_initial or increment < min_increment:
+            return cls.TOO_FAST
+
+        if initial > max_initial or increment > max_increment:
+            return cls.TOO_SLOW
