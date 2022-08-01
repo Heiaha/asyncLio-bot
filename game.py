@@ -1,6 +1,6 @@
 import asyncio
-import time
 import sys
+import time
 
 import chess
 import chess.engine
@@ -301,8 +301,12 @@ class Game:
         if not self.is_game_over():
             self.status = GameStatus.UNKNOWN_FINISH
 
-        if self.move_task and not self.move_task.done():
-            self.move_task.cancel()
+        if self.move_task:
+            # Try to have the most recent move task exit gracefully before trying to cancel it.
+            try:
+                await asyncio.wait_for(self.move_task, timeout=60)
+            except asyncio.TimeoutError:
+                self.move_task.cancel()
 
         logger.debug("Quitting engine.")
         await self.engine.quit()

@@ -6,8 +6,16 @@ import chess
 import httpx
 from loguru import logger
 
-from enums import DeclineReason
 from config import CONFIG
+from enums import DeclineReason
+
+
+def log_backoff(details: dict) -> None:
+    logger.debug(details)
+
+
+def log_giveup(details: dict) -> None:
+    logger.error(details)
 
 
 class Lichess:
@@ -23,34 +31,46 @@ class Lichess:
             base_url="https://lichess.org", headers=headers,
         )
 
+    @backoff.on_exception(
+        backoff.constant,
+        httpx.RequestError,  # non-HTTP status errors
+        max_time=60,
+        on_backoff=log_backoff,
+        on_giveup=log_giveup,
+        interval=0.1,
+    )
     @backoff.on_predicate(
         backoff.expo,
         lambda response: response.status_code >= 500,
         max_time=300,
-        on_backoff=lambda details: logger.warning(
-            f"Backing off get with args: {details['args']}, kwargs: {details['kwargs']}, status code: {details['value'].status_code}."
-        ),
+        on_backoff=log_backoff,
+        on_giveup=log_giveup,
     )
     async def get(self, endpoint: str, **kwargs) -> httpx.Response:
+        logger.debug(f"{endpoint}: {kwargs}.")
         response = await self.client.get(endpoint, **kwargs)
-        logger.debug(
-            f"Endpoint: {endpoint}, kwargs: {kwargs}, code: {response.status_code}, text: {response.text}"
-        )
+        logger.debug(f"{response.status_code}: {response.text}.")
         return response
 
+    @backoff.on_exception(
+        backoff.constant,
+        httpx.RequestError,  # non-HTTP status errors
+        max_time=60,
+        on_backoff=log_backoff,
+        on_giveup=log_giveup,
+        interval=0.1,
+    )
     @backoff.on_predicate(
         backoff.expo,
         lambda response: response.status_code >= 500,
         max_time=300,
-        on_backoff=lambda details: logger.warning(
-            f"Backing off post with args: {details['args']}, kwargs: {details['kwargs']}, status code: {details['value'].status_code}."
-        ),
+        on_backoff=log_backoff,
+        on_giveup=log_giveup,
     )
     async def post(self, endpoint: str, **kwargs) -> httpx.Response:
+        logger.debug(f"{endpoint}: {kwargs}.")
         response = await self.client.post(endpoint, **kwargs)
-        logger.debug(
-            f"Endpoint: {endpoint}, kwargs: {kwargs}, code: {response.status_code}, text: {response.text}"
-        )
+        logger.debug(f"{response.status_code}: {response.text}.")
         return response
 
     async def watch_event_stream(self) -> AsyncIterator[dict]:
@@ -70,7 +90,6 @@ class Lichess:
                 return
             except Exception as e:
                 logger.error(e)
-                pass
 
     async def watch_game_stream(self, game_id: str) -> AsyncIterator[dict]:
         while True:
@@ -89,8 +108,6 @@ class Lichess:
                 return
             except Exception as e:
                 logger.error(e)
-                if game_id not in await self.get_ongoing_games():
-                    return
 
     async def get_online_bots(self) -> AsyncIterator[dict]:
         try:
