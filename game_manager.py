@@ -58,9 +58,6 @@ class GameManager:
             while self.is_under_concurrency_limit() and self.challenge_queue:
                 await self.li.accept_challenge(self.challenge_queue.popleft())
 
-    async def on_ping(self):
-        self.clean_games()
-
     async def on_game_start(self, event: dict) -> None:
         game_id = event["game"]["id"]
         opponent = event["game"]["opponent"]["username"]
