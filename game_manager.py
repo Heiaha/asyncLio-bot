@@ -1,14 +1,16 @@
 import asyncio
+import logging
 from collections import deque
 from typing import NoReturn
-
-from loguru import logger
 
 from config import CONFIG
 from enums import Event, DeclineReason
 from game import Game
 from lichess import Lichess
 from matchmaker import Matchmaker
+
+
+logger = logging.getLogger(__name__)
 
 
 class GameManager:

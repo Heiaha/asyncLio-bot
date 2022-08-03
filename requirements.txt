@@ -2,4 +2,3 @@ httpx ~= 0.23.0
 chess ~= 1.9.2
 PyYAML ~= 6.0
 backoff ~= 2.1.2
-loguru ~= 0.6.0

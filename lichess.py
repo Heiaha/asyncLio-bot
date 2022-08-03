@@ -1,21 +1,17 @@
 import json
+import logging
 from typing import AsyncIterator
 
 import backoff
 import chess
 import httpx
-from loguru import logger
+
 
 from config import CONFIG
 from enums import DeclineReason
 
 
-def log_backoff(details: dict) -> None:
-    logger.debug(details)
-
-
-def log_giveup(details: dict) -> None:
-    logger.error(details)
+logger = logging.getLogger(__name__)
 
 
 class Lichess:
@@ -35,43 +31,41 @@ class Lichess:
         backoff.constant,
         httpx.RequestError,  # non-HTTP status errors
         max_time=60,
-        on_backoff=log_backoff,
-        on_giveup=log_giveup,
+        logger=logger,
         interval=0.1,
+        backoff_log_level=logging.DEBUG,
+        giveup_log_level=logging.ERROR,
     )
     @backoff.on_predicate(
         backoff.expo,
         lambda response: response.status_code >= 500,
         max_time=300,
-        on_backoff=log_backoff,
-        on_giveup=log_giveup,
+        logger=logger,
+        backoff_log_level=logging.DEBUG,
+        giveup_log_level=logging.ERROR,
     )
     async def get(self, endpoint: str, **kwargs) -> httpx.Response:
-        logger.debug(f"{endpoint}: {kwargs}.")
-        response = await self.client.get(endpoint, **kwargs)
-        logger.debug(f"{response.status_code}: {response.text}.")
-        return response
+        return await self.client.get(endpoint, **kwargs)
 
     @backoff.on_exception(
         backoff.constant,
         httpx.RequestError,  # non-HTTP status errors
         max_time=60,
-        on_backoff=log_backoff,
-        on_giveup=log_giveup,
+        logger=logger,
         interval=0.1,
+        backoff_log_level=logging.DEBUG,
+        giveup_log_level=logging.ERROR,
     )
     @backoff.on_predicate(
         backoff.expo,
         lambda response: response.status_code >= 500,
         max_time=300,
-        on_backoff=log_backoff,
-        on_giveup=log_giveup,
+        logger=logger,
+        backoff_log_level=logging.DEBUG,
+        giveup_log_level=logging.ERROR,
     )
     async def post(self, endpoint: str, **kwargs) -> httpx.Response:
-        logger.debug(f"{endpoint}: {kwargs}.")
-        response = await self.client.post(endpoint, **kwargs)
-        logger.debug(f"{response.status_code}: {response.text}.")
-        return response
+        return await self.client.post(endpoint, **kwargs)
 
     async def watch_event_stream(self) -> AsyncIterator[dict]:
         while True:

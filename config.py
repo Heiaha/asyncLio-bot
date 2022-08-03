@@ -1,7 +1,11 @@
 import os
 
 import yaml
-from loguru import logger
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 
 with open("config.yml", "r") as config_file:
     try:

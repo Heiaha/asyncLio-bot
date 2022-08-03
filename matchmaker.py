@@ -1,11 +1,13 @@
+import logging
 import random
 from typing import Any
-
-from loguru import logger
 
 from config import CONFIG
 from enums import PerfType, Variant
 from lichess import Lichess
+
+
+logger = logging.getLogger(__name__)
 
 
 class Bot:

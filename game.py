@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import sys
 import time
 
@@ -6,11 +7,12 @@ import chess
 import chess.engine
 import chess.polyglot
 import chess.variant
-from loguru import logger
 
 from config import CONFIG
 from enums import GameStatus, GameEvent, Variant, BookSelection
 from lichess import Lichess
+
+logger = logging.getLogger(__name__)
 
 
 class Game:

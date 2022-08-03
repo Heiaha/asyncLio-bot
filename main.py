@@ -1,11 +1,11 @@
 import argparse
 import asyncio
+import logging
 import sys
 from argparse import ArgumentParser
 from typing import NoReturn
 
 import chess.engine
-from loguru import logger
 
 from game_manager import GameManager
 from lichess import Lichess
@@ -19,14 +19,21 @@ LOGO = """
            |___/                                               
            """
 
+LOGGER_FORMAT = "%(asctime)s %(name)s %(levelname)s %(message)s"
+
+logger = logging.getLogger(__name__)
+
 
 async def main(args: argparse.Namespace) -> NoReturn:
-    log_level = "DEBUG" if args.verbose else "INFO"
-
-    logger.remove()
-    logger.add(sys.stderr, level=log_level)
+    logging_handlers = [logging.StreamHandler()]
     if args.log:
-        logger.add(args.log, level=log_level)
+        logging_handlers.append(logging.FileHandler(args.log))
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-8s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=logging_handlers,
+    )
 
     logger.info(LOGO)
 
