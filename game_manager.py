@@ -9,7 +9,6 @@ from game import Game
 from lichess import Lichess
 from matchmaker import Matchmaker
 
-
 logger = logging.getLogger(__name__)
 
 

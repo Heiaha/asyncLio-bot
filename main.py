@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import logging
-import sys
 from argparse import ArgumentParser
 from typing import NoReturn
 

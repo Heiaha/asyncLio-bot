@@ -6,10 +6,8 @@ import backoff
 import chess
 import httpx
 
-
 from config import CONFIG
 from enums import DeclineReason
-
 
 logger = logging.getLogger(__name__)
 

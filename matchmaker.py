@@ -6,7 +6,6 @@ from config import CONFIG
 from enums import PerfType, Variant
 from lichess import Lichess
 
-
 logger = logging.getLogger(__name__)
 
 
