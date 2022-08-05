@@ -16,12 +16,12 @@ class Bot:
         self._ratings = {}
         self._num_games = {}
         for perf_type in PerfType:
-            self._ratings[perf_type] = (
-                info["perfs"].get(perf_type.value, {}).get("rating", 1500)
-            )
-            self._num_games[perf_type] = (
-                info["perfs"].get(perf_type.value, {}).get("games", 0)
-            )
+            if perf_info := info["perfs"].get(perf_type.value):
+                self._ratings[perf_type] = perf_info["rating"]
+                self._num_games[perf_type] = perf_info["games"]
+            else:
+                self._ratings[perf_type] = 1500
+                self._num_games[perf_type] = 0
 
     @property
     def total_games(self) -> int:
