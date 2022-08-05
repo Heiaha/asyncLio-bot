@@ -15,6 +15,9 @@ from lichess import Lichess
 logger = logging.getLogger(__name__)
 
 
+ENGINE_STR_FORMAT = "{id} -- Engine: {move_number}{ellipses:<4} {move:<10}{score:<20}Time: {time:<12.1f}Depth: {depth:<10}PV: {pv!s:<30}"
+
+
 class Game:
     def __init__(self, li: Lichess, event: dict) -> None:
         self.li: Lichess = li
@@ -191,46 +194,37 @@ class Game:
     def format_engine_move_message(
         self, move: chess.Move, info: chess.engine.InfoDict
     ) -> str:
-        message = f"{self.id} -- Engine: "
-        if self.board.turn:
-            move_number = str(self.board.fullmove_number) + "."
-            message += f"{move_number:4} {self.board.san(move):<10}"
-        else:
-            move_number = str(self.board.fullmove_number) + "..."
-            message += f"{move_number:6} {self.board.san(move):<10}"
 
-        if score := info.get(
-            "score", chess.engine.PovScore(chess.engine.Cp(0), self.color)
-        ):
+        score_str = "Score: None"
+        if score := info.get("score"):
             if moves_to_go := score.pov(self.color).mate():
-                moves_to_go_str = (
-                    f"+{moves_to_go}" if moves_to_go > 0 else f"{moves_to_go}"
-                )
-                message += f"Mate: {moves_to_go_str:<10}"
-            else:
-                if (cp_score := score.pov(self.board.turn).score()) is not None:
-                    score_str = f"+{cp_score}" if cp_score > 0 else f"{cp_score}"
-                    message += f"CP Score: {score_str:<10}"
+                score_str = f"Mate: {moves_to_go:+}"
+            elif (cp_score := score.pov(self.board.turn).score()) is not None:
+                score_str = f"CP Score: {cp_score:+}"
 
-        if think_time := info.get("time", 0.0):
-            message += f"Time: {think_time:<10.1f}"
-
-        if depth := info.get("depth", 1):
-            message += f"Depth: {depth:<10}"
-
+        pv_str = "None"
         if pv := info.get("pv"):
-            message += f"PV: {self.board.variation_san(pv)}"
+            pv_str = self.board.variation_san(pv)
 
-        return message
+        return ENGINE_STR_FORMAT.format(
+            id=self.id,
+            move_number=self.board.fullmove_number,
+            ellipses="." if self.board.turn == chess.WHITE else "...",
+            move=self.board.san(move),
+            score=score_str,
+            time=info.get("time", 0.0),
+            depth=info.get("depth", 1),
+            pv=pv_str
+        )
 
-    def format_result_message(self, winner_str: str | None) -> str:
+    def format_result_message(self, event: dict) -> str:
 
-        if winner_str == "white":
-            winner = chess.WHITE
-        elif winner_str == "black":
-            winner = chess.BLACK
-        else:
-            winner = None
+        winner = None
+        if winner_str := event.get("winner"):
+            if winner_str == "white":
+                winner = chess.WHITE
+            elif winner_str == "black":
+                winner = chess.BLACK
 
         winning_name = self.li.username if winner == self.color else self.opponent
         losing_name = self.opponent if winner == self.color else self.li.username
@@ -276,7 +270,7 @@ class Game:
                 updated = self.update(event)
 
                 if self.is_game_over():
-                    message = self.format_result_message(event.get("winner"))
+                    message = self.format_result_message(event)
                     logger.info(message)
                     break
 
