@@ -71,7 +71,8 @@ class Game:
         elif self.variant == Variant.FROM_POSITION:
             board = chess.Board(self.initial_fen)
         else:
-            board = chess.variant.find_variant(self.variant.value)()
+            variant_board_type = chess.variant.find_variant(self.variant.value)
+            board = variant_board_type()
 
         if moves:
             for move in moves:
