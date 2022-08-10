@@ -98,7 +98,7 @@ class GameManager:
         logger.info(f"{challenge_id} -- Challenger: {challenger_name}.")
         if decline_reason := DeclineReason.from_event(event):
             logger.info(
-                f"Declining challenge from {challenger_name} for reason: {decline_reason}."
+                f"{challenge_id} -- Declining challenge from {challenger_name} for reason: {decline_reason}."
             )
             await self.li.decline_challenge(challenge_id, reason=decline_reason)
         else:
