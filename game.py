@@ -15,9 +15,6 @@ from lichess import Lichess
 logger = logging.getLogger(__name__)
 
 
-ENGINE_STR_FORMAT = "{id} -- Engine: {move_number}{ellipses:<4} {move:<10}{score:<20}Time: {time:<12.1f}Depth: {depth:<10}PV: {pv!s:<30}"
-
-
 class Game:
     def __init__(self, li: Lichess, event: dict) -> None:
         self.li: Lichess = li
@@ -43,13 +40,13 @@ class Game:
         self.engine: chess.engine.UciProtocol | None = None
 
     async def setup(self) -> None:
-        logger.debug(f"Starting engine {CONFIG['engine']['path']}.")
+        logger.debug(f"{self.id} -- Starting engine {CONFIG['engine']['path']}.")
         try:
             transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
             if options := CONFIG["engine"].get("uci_options"):
                 await engine.configure(options)
         except Exception as e:
-            logger.critical(e)
+            logger.critical(f"{self.id} -- {e}")
             sys.exit()
         self.engine = engine
         self.start_time = time.monotonic()
@@ -112,12 +109,12 @@ class Game:
                         move = reader.choice(board).move
                     elif selection == BookSelection.BEST_MOVE:
                         move = reader.find(board).move
-                    board.push(move)
-                    if not board.is_repetition(count=2):
-                        return move
-                    board.pop()
                 except IndexError:
-                    pass
+                    continue
+                board.push(move)
+                if not board.is_repetition(count=2):
+                    return move
+                board.pop()
 
     async def get_engine_move(self) -> tuple[chess.Move, chess.engine.InfoDict]:
         if len(self.board.move_stack) < 2:
@@ -158,7 +155,7 @@ class Game:
             return
 
         if resign:
-            logger.info(f"Resigning game {self.id}.")
+            logger.info(f"{self.id} -- Resigning game.")
             await self.li.resign_game(self.id)
         else:
             logger.info(message)
@@ -206,7 +203,7 @@ class Game:
         if pv := info.get("pv"):
             pv_str = self.board.variation_san(pv)
 
-        return ENGINE_STR_FORMAT.format(
+        return "{id} -- Engine: {move_number}{ellipses:<4} {move:<10}{score:<20}Time: {time:<12.1f}Depth: {depth:<10}PV: {pv!s:<30}".format(
             id=self.id,
             move_number=self.board.fullmove_number,
             ellipses="." if self.board.turn == chess.WHITE else "...",
@@ -218,7 +215,6 @@ class Game:
         )
 
     def format_result_message(self, event: dict) -> str:
-
         winner = None
         if winner_str := event.get("winner"):
             if winner_str == "white":
@@ -253,7 +249,7 @@ class Game:
             message = "Game aborted."
         else:
             message = "Game finish unknown."
-        return message
+        return f"{self.id} -- {message}"
 
     async def _play(self):
         abort_count = 0
@@ -305,7 +301,7 @@ class Game:
             except asyncio.TimeoutError:
                 self.move_task.cancel()
 
-        logger.debug("Quitting engine.")
+        logger.debug(f"{self.id} -- Quitting engine.")
         await self.engine.quit()
 
     def is_game_over(self) -> bool:
