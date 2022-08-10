@@ -311,5 +311,5 @@ class Game:
     def is_game_over(self) -> bool:
         return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
 
-    def play(self) -> None:
+    def start(self) -> None:
         self.loop_task = asyncio.create_task(self._play())

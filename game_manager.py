@@ -69,7 +69,7 @@ class GameManager:
             return
 
         game = Game(self.li, event)
-        game.play()  # non-blocking task creation
+        game.start()  # non-blocking task creation
         self.current_games[game_id] = game
 
         self.event.set()
