@@ -52,12 +52,11 @@ class GameManager:
             except asyncio.TimeoutError:
                 if self.is_under_concurrency_limit():
                     await self.matchmaker.challenge()
-                continue
-
-            self.event.clear()
-
-            while self.is_under_concurrency_limit() and self.challenge_queue:
-                await self.li.accept_challenge(self.challenge_queue.popleft())
+            else:
+                self.event.clear()
+                # Only accept one game per event.
+                if self.is_under_concurrency_limit() and self.challenge_queue:
+                    await self.li.accept_challenge(self.challenge_queue.popleft())
 
     async def on_game_start(self, event: dict) -> None:
         game_id = event["game"]["id"]

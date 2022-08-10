@@ -214,7 +214,7 @@ class Game:
             score=score_str,
             time=info.get("time", 0.0),
             depth=info.get("depth", 1),
-            pv=pv_str
+            pv=pv_str,
         )
 
     def format_result_message(self, event: dict) -> str:
