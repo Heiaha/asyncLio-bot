@@ -38,7 +38,7 @@ class GameManager:
                 await self.on_challenge(event)
 
             elif event_type == Event.CHALLENGE_CANCELED:
-                self.on_challenge_cancelled(event)
+                self.on_challenge_canceled(event)
 
     async def challenge_loop(self) -> NoReturn:
         while True:
@@ -105,7 +105,7 @@ class GameManager:
             self.challenge_queue.append(challenge_id)
             self.event.set()
 
-    def on_challenge_cancelled(self, event: dict) -> None:
+    def on_challenge_canceled(self, event: dict) -> None:
         challenge_id = event["challenge"]["id"]
         challenger_name = event["challenge"]["challenger"]["name"]
         if challenge_id in self.challenge_queue:
