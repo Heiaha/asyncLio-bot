@@ -22,7 +22,8 @@ class Lichess:
         self.title = user_info.get("title", "")
         headers["User-Agent"] = f"asyncLio-bot user:{self.username}"
         self.client = httpx.AsyncClient(
-            base_url="https://lichess.org", headers=headers,
+            base_url="https://lichess.org",
+            headers=headers,
         )
 
     @backoff.on_exception(
@@ -30,7 +31,6 @@ class Lichess:
         httpx.RequestError,  # non-HTTP status errors
         max_time=60,
         logger=logger,
-        interval=0.1,
         backoff_log_level=logging.DEBUG,
         giveup_log_level=logging.ERROR,
     )
@@ -50,7 +50,6 @@ class Lichess:
         httpx.RequestError,  # non-HTTP status errors
         max_time=60,
         logger=logger,
-        interval=0.1,
         backoff_log_level=logging.DEBUG,
         giveup_log_level=logging.ERROR,
     )
@@ -65,40 +64,49 @@ class Lichess:
     async def post(self, endpoint: str, **kwargs) -> httpx.Response:
         return await self.client.post(endpoint, **kwargs)
 
-    async def watch_event_stream(self) -> AsyncIterator[dict]:
-        while True:
-            try:
-                async with self.client.stream(
-                    "GET", "/api/stream/event", timeout=None
-                ) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if line.strip():
-                            event = json.loads(line)
-                            logger.debug(f"Event: {event}")
-                        else:
-                            event = {"type": "ping"}
-                        yield event
-            except Exception as e:
-                logger.error(e)
+    @backoff.on_exception(
+        backoff.constant,
+        httpx.HTTPError,
+        logger=logger,
+        backoff_log_level=logging.DEBUG,
+        giveup_log_level=logging.ERROR,
+    )
+    async def event_stream(self) -> AsyncIterator[dict]:
+        async with self.client.stream(
+            "GET", "/api/stream/event", timeout=None
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if line.strip():
+                    event = json.loads(line)
+                    logger.debug(f"Event: {event}")
+                else:
+                    event = {"type": "ping"}
+                yield event
 
-    async def watch_game_stream(self, game_id: str) -> AsyncIterator[dict]:
-        while True:
-            try:
-                async with self.client.stream(
-                    "GET", f"/api/bot/game/stream/{game_id}", timeout=None,
-                ) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if line.strip():
-                            event = json.loads(line)
-                            logger.debug(f"Game event: {event}")
-                        else:
-                            event = {"type": "ping"}
-                        yield event
-                return
-            except Exception as e:
-                logger.error(e)
+    @backoff.on_exception(
+        backoff.constant,
+        httpx.HTTPError,
+        logger=logger,
+        backoff_log_level=logging.DEBUG,
+        giveup_log_level=logging.ERROR,
+    )
+    async def game_stream(self, game_id: str) -> AsyncIterator[dict]:
+        game_id = "HdnBCaVr"
+        async with self.client.stream(
+            "GET",
+            f"/api/bot/game/stream/{game_id}",
+            timeout=None,
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if line.strip():
+                    event = json.loads(line)
+                    logger.debug(f"Game event: {event}")
+                else:
+                    event = {"type": "ping"}
+                yield event
+        print("Leaving game stream.")
 
     async def get_online_bots(self) -> AsyncIterator[dict]:
         try:

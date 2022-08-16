@@ -254,12 +254,12 @@ class Game:
     async def _play(self):
         abort_count = 0
         await self.setup()
-        async for event in self.li.watch_game_stream(self.id):
+        async for event in self.li.game_stream(self.id):
             event_type = GameEvent(event["type"])
 
             if event_type == GameEvent.GAME_FULL:
                 self.update(event["state"])
-                if self.is_our_turn():
+                if self.is_our_turn() and not self.is_game_over():
                     self.move_task = asyncio.create_task(self.make_move())
 
             elif event_type == GameEvent.GAME_STATE:
@@ -288,9 +288,7 @@ class Game:
                         self.status = GameStatus.ABORTED
                         break
 
-        # It's possible we've reached this stage because the server has > 500'd
-        # and the iterator has unexpectedly closed without setting the status to be in a finished state.
-        # If that's true we need to set the game to be over, so that it can be cleaned up by the game manager.
+        # Just in case we've reached this stage unexpectedly.
         if not self.is_game_over():
             self.status = GameStatus.UNKNOWN_FINISH
 

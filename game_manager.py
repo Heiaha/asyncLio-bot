@@ -22,7 +22,7 @@ class GameManager:
 
     async def event_loop(self) -> NoReturn:
         asyncio.create_task(self.challenge_loop())
-        async for event in self.li.watch_event_stream():
+        async for event in self.li.event_stream():
             event_type = Event(event["type"])
 
             if event_type == Event.PING:
