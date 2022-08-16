@@ -105,7 +105,6 @@ class Lichess:
                 else:
                     event = {"type": "ping"}
                 yield event
-        print("Leaving game stream.")
 
     async def get_online_bots(self) -> AsyncIterator[dict]:
         try:
