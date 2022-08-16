@@ -92,7 +92,6 @@ class Lichess:
         giveup_log_level=logging.ERROR,
     )
     async def game_stream(self, game_id: str) -> AsyncIterator[dict]:
-        game_id = "HdnBCaVr"
         async with self.client.stream(
             "GET",
             f"/api/bot/game/stream/{game_id}",
