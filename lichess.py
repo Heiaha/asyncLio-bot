@@ -79,7 +79,6 @@ class Lichess:
                         else:
                             event = {"type": "ping"}
                         yield event
-                return
             except Exception as e:
                 logger.error(e)
 
