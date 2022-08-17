@@ -18,8 +18,6 @@ LOGO = """
            |___/                                               
            """
 
-LOGGER_FORMAT = "%(asctime)s %(name)s %(levelname)s %(message)s"
-
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +32,7 @@ async def main(args: argparse.Namespace) -> NoReturn:
         handlers=logging_handlers,
     )
 
-    logger.info(LOGO)
+    print(LOGO)
 
     li = Lichess()
 
