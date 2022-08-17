@@ -292,13 +292,6 @@ class Game:
         if not self.is_game_over():
             self.status = GameStatus.UNKNOWN_FINISH
 
-        if self.move_task:
-            # Try to have the most recent move task exit gracefully before trying to cancel it.
-            try:
-                await asyncio.wait_for(self.move_task, timeout=60)
-            except asyncio.TimeoutError:
-                self.move_task.cancel()
-
         logger.debug(f"{self.id} -- Quitting engine.")
         await self.engine.quit()
 
