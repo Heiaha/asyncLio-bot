@@ -39,12 +39,12 @@ class Game:
         self.black_inc: int | None = None
         self.engine: chess.engine.UciProtocol | None = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         white_name, black_name = self.player_names
         return f"{self.id} -- {white_name} v. {black_name}"
 
     @property
-    def me(self):
+    def me(self) -> str:
         return f"{self.li.title} {self.li.username}"
 
     @property
