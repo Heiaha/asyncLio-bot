@@ -259,7 +259,13 @@ class Game:
 
             if event_type == GameEvent.GAME_FULL:
                 self.update(event["state"])
-                if self.is_our_turn() and not self.is_game_over():
+
+                # Only make a move if it's the beginning of the game it's our turn.
+                if (
+                    self.is_our_turn()
+                    and not self.is_game_over()
+                    and self.move_task is None
+                ):
                     self.move_task = asyncio.create_task(self.make_move())
 
             elif event_type == GameEvent.GAME_STATE:
