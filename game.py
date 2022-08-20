@@ -39,7 +39,7 @@ class Game:
         self.black_inc: int | None = None
         self.engine: chess.engine.UciProtocol | None = None
 
-    async def setup(self) -> None:
+    async def start_engine(self) -> None:
         logger.debug(f"{self.id} -- Starting engine {CONFIG['engine']['path']}.")
         try:
             transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
@@ -49,7 +49,6 @@ class Game:
             logger.critical(f"{self.id} -- {e}")
             sys.exit()
         self.engine = engine
-        self.start_time = time.monotonic()
 
     def update(self, event: dict) -> bool:
         self.status = GameStatus(event["status"])
@@ -252,8 +251,9 @@ class Game:
         return f"{self.id} -- {message}"
 
     async def _play(self):
+        self.start_time = time.monotonic()
         abort_count = 0
-        await self.setup()
+        await self.start_engine()
         async for event in self.li.game_stream(self.id):
             event_type = GameEvent(event["type"])
 
