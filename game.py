@@ -81,6 +81,9 @@ class Game:
     def is_our_turn(self) -> bool:
         return self.color == self.board.turn
 
+    def is_game_over(self) -> bool:
+        return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
+
     def get_book_move(self) -> chess.Move | None:
         if not CONFIG["books"]["enabled"]:
             return
@@ -250,6 +253,9 @@ class Game:
             message = "Game finish unknown."
         return f"{self.id} -- {message}"
 
+    def start(self) -> None:
+        self.loop_task = asyncio.create_task(self._play())
+
     async def _play(self):
         self.start_time = time.monotonic()
         abort_count = 0
@@ -264,7 +270,7 @@ class Game:
                 if (
                     self.is_our_turn()
                     and not self.is_game_over()
-                    and self.move_task is None
+                    and len(self.board.move_stack) == 0
                 ):
                     self.move_task = asyncio.create_task(self.make_move())
 
@@ -301,8 +307,13 @@ class Game:
         logger.debug(f"{self.id} -- Quitting engine.")
         await self.engine.quit()
 
-    def is_game_over(self) -> bool:
-        return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
-
-    def start(self) -> None:
-        self.loop_task = asyncio.create_task(self._play())
+        if self.move_task:
+            # Try to have the most recent move task exit gracefully and raise any exceptions before trying to cancel it.
+            try:
+                await asyncio.wait_for(self.move_task, timeout=60)
+            except asyncio.TimeoutError:
+                self.move_task.cancel()
+            except chess.engine.EngineTerminatedError:
+                pass
+            except Exception as e:
+                logger.error(e)
