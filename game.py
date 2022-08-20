@@ -39,6 +39,26 @@ class Game:
         self.black_inc: int | None = None
         self.engine: chess.engine.UciProtocol | None = None
 
+    def __str__(self):
+        white_name, black_name = self.player_names
+        return f"{self.id} -- {white_name} v. {black_name}"
+
+    @property
+    def player_names(self) -> tuple[str, str]:
+        if self.color == chess.WHITE:
+            return self.li.username, self.opponent
+        elif self.color == chess.BLACK:
+            return self.opponent, self.li.username
+        raise ValueError("Colors unknown.")
+
+    @property
+    def is_our_turn(self) -> bool:
+        return self.color == self.board.turn
+
+    @property
+    def is_game_over(self) -> bool:
+        return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
+
     async def start_engine(self) -> None:
         logger.debug(f"{self.id} -- Starting engine {CONFIG['engine']['path']}.")
         try:
@@ -78,11 +98,92 @@ class Game:
                 board.push_uci(move)
         return board
 
-    def is_our_turn(self) -> bool:
-        return self.color == self.board.turn
+    def should_draw(self) -> bool:
+        if not CONFIG["draw"]["enabled"]:
+            return False
 
-    def is_game_over(self) -> bool:
-        return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
+        if self.board.fullmove_number < CONFIG["draw"]["min_game_length"]:
+            return False
+
+        if len(self.scores) < CONFIG["draw"]["moves"]:
+            return False
+
+        return all(
+            abs(score.relative) <= chess.engine.Cp(CONFIG["draw"]["score"])
+            for score in self.scores[-CONFIG["draw"]["moves"] :]
+        )
+
+    def should_resign(self) -> bool:
+        if not CONFIG["resign"]["enabled"]:
+            return False
+
+        if len(self.scores) < CONFIG["resign"]["moves"]:
+            return False
+
+        return all(
+            score.relative <= chess.engine.Cp(CONFIG["resign"]["score"])
+            for score in self.scores[-CONFIG["resign"]["moves"] :]
+        )
+
+    def format_engine_move_message(
+        self, move: chess.Move, info: chess.engine.InfoDict
+    ) -> str:
+
+        score_str = "Score: None"
+        if score := info.get("score"):
+            if moves_to_go := score.pov(self.color).mate():
+                score_str = f"Mate: {moves_to_go:+}"
+            elif (cp_score := score.pov(self.board.turn).score()) is not None:
+                score_str = f"CP Score: {cp_score:+}"
+
+        pv_str = "None"
+        if pv := info.get("pv"):
+            pv_str = self.board.variation_san(pv)
+
+        return "{id} -- Engine: {move_number}{ellipses:<4} {move:<10}{score:<20}Time: {time:<12.1f}Depth: {depth:<10}PV: {pv!s:<30}".format(
+            id=self.id,
+            move_number=self.board.fullmove_number,
+            ellipses="." if self.board.turn == chess.WHITE else "...",
+            move=self.board.san(move),
+            score=score_str,
+            time=info.get("time", 0.0),
+            depth=info.get("depth", 1),
+            pv=pv_str,
+        )
+
+    def format_result_message(self, event: dict) -> str:
+
+        winning_color = event.get("winner")
+        white_name, black_name = self.player_names
+
+        winning_name = white_name if winning_color == "white" else black_name
+        losing_name = white_name if winning_color == "black" else black_name
+
+        if winning_color:
+            message = f"{winning_name} won"
+
+            if self.status == GameStatus.MATE:
+                message += " by checkmate!"
+            elif self.status == GameStatus.OUT_OF_TIME:
+                message += f"! {losing_name} ran out of time."
+            elif self.status == GameStatus.RESIGN:
+                message += f"! {losing_name} resigned."
+        elif self.status == GameStatus.DRAW:
+            if self.board.is_fifty_moves():
+                message = "Game drawn by 50-move rule."
+            elif self.board.is_repetition():
+                message = "Game drawn by threefold repetition."
+            elif self.board.is_insufficient_material():
+                message = "Game drawn due to insufficient material."
+            else:
+                message = "Game drawn by agreement."
+        elif self.status == GameStatus.STALEMATE:
+            message = "Game drawn by stalemate."
+        elif self.status == GameStatus.ABORTED:
+            message = "Game aborted."
+        else:
+            message = "Game finish unknown."
+        return f"{self.id} -- {message}"
 
     def get_book_move(self) -> chess.Move | None:
         if not CONFIG["books"]["enabled"]:
@@ -153,105 +254,18 @@ class Game:
             resign = self.should_resign()
             offer_draw = self.should_draw()
 
-        if self.is_game_over():
+        logger.info(message)
+
+        if self.is_game_over:
             return
 
         if resign:
             logger.info(f"{self.id} -- Resigning game.")
             await self.li.resign_game(self.id)
         else:
-            logger.info(message)
+            if offer_draw:
+                logger.info(f"{self.id} -- Offering draw.")
             await self.li.make_move(self.id, move, offer_draw=offer_draw)
-
-    def should_draw(self) -> bool:
-        if not CONFIG["draw"]["enabled"]:
-            return False
-
-        if self.board.fullmove_number < CONFIG["draw"]["min_game_length"]:
-            return False
-
-        if len(self.scores) < CONFIG["draw"]["moves"]:
-            return False
-
-        return all(
-            abs(score.relative) <= chess.engine.Cp(CONFIG["draw"]["score"])
-            for score in self.scores[-CONFIG["draw"]["moves"] :]
-        )
-
-    def should_resign(self) -> bool:
-        if not CONFIG["resign"]["enabled"]:
-            return False
-
-        if len(self.scores) < CONFIG["resign"]["moves"]:
-            return False
-
-        return all(
-            score.relative <= chess.engine.Cp(CONFIG["resign"]["score"])
-            for score in self.scores[-CONFIG["resign"]["moves"] :]
-        )
-
-    def format_engine_move_message(
-        self, move: chess.Move, info: chess.engine.InfoDict
-    ) -> str:
-
-        score_str = "Score: None"
-        if score := info.get("score"):
-            if moves_to_go := score.pov(self.color).mate():
-                score_str = f"Mate: {moves_to_go:+}"
-            elif (cp_score := score.pov(self.board.turn).score()) is not None:
-                score_str = f"CP Score: {cp_score:+}"
-
-        pv_str = "None"
-        if pv := info.get("pv"):
-            pv_str = self.board.variation_san(pv)
-
-        return "{id} -- Engine: {move_number}{ellipses:<4} {move:<10}{score:<20}Time: {time:<12.1f}Depth: {depth:<10}PV: {pv!s:<30}".format(
-            id=self.id,
-            move_number=self.board.fullmove_number,
-            ellipses="." if self.board.turn == chess.WHITE else "...",
-            move=self.board.san(move),
-            score=score_str,
-            time=info.get("time", 0.0),
-            depth=info.get("depth", 1),
-            pv=pv_str,
-        )
-
-    def format_result_message(self, event: dict) -> str:
-        winner = None
-        if winner_str := event.get("winner"):
-            if winner_str == "white":
-                winner = chess.WHITE
-            elif winner_str == "black":
-                winner = chess.BLACK
-
-        winning_name = self.li.username if winner == self.color else self.opponent
-        losing_name = self.opponent if winner == self.color else self.li.username
-
-        if winner is not None:
-            message = f"{winning_name} won"
-
-            if self.status == GameStatus.MATE:
-                message += " by checkmate!"
-            elif self.status == GameStatus.OUT_OF_TIME:
-                message += f"! {losing_name} ran out of time."
-            elif self.status == GameStatus.RESIGN:
-                message += f"! {losing_name} resigned."
-        elif self.status == GameStatus.DRAW:
-            if self.board.is_fifty_moves():
-                message = "Game drawn by 50-move rule."
-            elif self.board.is_repetition():
-                message = "Game drawn by threefold repetition."
-            elif self.board.is_insufficient_material():
-                message = "Game drawn due to insufficient material."
-            else:
-                message = "Game drawn by agreement."
-        elif self.status == GameStatus.STALEMATE:
-            message = "Game drawn by stalemate."
-        elif self.status == GameStatus.ABORTED:
-            message = "Game aborted."
-        else:
-            message = "Game finish unknown."
-        return f"{self.id} -- {message}"
 
     def start(self) -> None:
         self.loop_task = asyncio.create_task(self._play())
@@ -266,29 +280,29 @@ class Game:
             if event_type == GameEvent.GAME_FULL:
                 self.update(event["state"])
 
-                # Only make a move here if it's the beginning of the game and is our turn.
+                # Only make a move here if we haven't made a move yet and it's our turn.
                 if (
-                    self.is_our_turn()
-                    and not self.is_game_over()
-                    and len(self.board.move_stack) == 0
+                    self.is_our_turn
+                    and not self.is_game_over
+                    and self.move_task is None
                 ):
                     self.move_task = asyncio.create_task(self.make_move())
 
             elif event_type == GameEvent.GAME_STATE:
                 updated = self.update(event)
 
-                if self.is_game_over():
+                if self.is_game_over:
                     message = self.format_result_message(event)
                     logger.info(message)
                     break
 
-                if self.is_our_turn() and updated:
+                if self.is_our_turn and updated:
                     self.move_task = asyncio.create_task(self.make_move())
 
             elif event_type == GameEvent.PING:
                 if (
                     len(self.board.move_stack) < 2
-                    and not self.is_our_turn()
+                    and not self.is_our_turn
                     and time.monotonic() > self.start_time + CONFIG["abort_time"]
                 ):
                     await self.li.abort_game(self.id)
@@ -301,7 +315,7 @@ class Game:
                         break
 
         # Just in case we've reached this stage unexpectedly.
-        if not self.is_game_over():
+        if not self.is_game_over:
             self.status = GameStatus.UNKNOWN_FINISH
 
         logger.debug(f"{self.id} -- Quitting engine.")

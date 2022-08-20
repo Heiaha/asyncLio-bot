@@ -73,8 +73,8 @@ class GameManager:
         self.current_games[game_id] = game
 
         self.event.set()
-        logger.info(f"Game {game_id} starting against {opponent}.")
         logger.info(f"Current Processes: {len(self.current_games)}.")
+        logger.info(f"{game} starting.")
 
     async def on_game_finish(self, event: dict) -> None:
         if (game_id := event["game"]["id"]) in self.current_games:
@@ -85,6 +85,8 @@ class GameManager:
                 await game.loop_task
             except Exception as e:
                 logger.error(e)
+
+            logger.info(f"{game} finished.")
 
         self.event.set()
         logger.info(f"Current Processes: {len(self.current_games)}.")
@@ -121,5 +123,5 @@ class GameManager:
         self.current_games = {
             game_id: game
             for game_id, game in self.current_games.items()
-            if not game.is_game_over()
+            if not game.is_game_over
         }
