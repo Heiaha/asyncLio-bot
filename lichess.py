@@ -133,26 +133,6 @@ class Lichess:
             logger.error(f"{response.status_code}: {response.text}")
             return False
 
-    async def create_challenge(
-        self, opponent: str, initial_time: int, increment: int = 0
-    ) -> str:
-
-        response = await self.post(
-            f"/api/challenge/{opponent}",
-            data={
-                "rated": str(CONFIG["matchmaking"]["rated"]).lower(),
-                "clock.limit": initial_time,
-                "clock.increment": increment,
-                "variant": CONFIG["matchmaking"]["variant"],
-                "color": "random",
-            },
-        )
-        if response.status_code == 200:
-            return response.json()["challenge"]["id"]
-        else:
-            logger.error(f"{response.status_code}: {response.text}")
-            return ""
-
     async def cancel_challenge(self, challenge_id: str) -> bool:
         response = await self.post(f"/api/challenge/{challenge_id}/cancel")
         if response.status_code == 200:
@@ -177,21 +157,13 @@ class Lichess:
             logger.error(f"{response.status_code}: {response.text}")
             return False
 
-    async def get_open_challenges(self) -> dict:
-        response = await self.get("/api/challenge")
+    async def upgrade_account(self) -> bool:
+        response = await self.post("/api/bot/account/upgrade")
         if response.status_code == 200:
-            return response.json()
+            return True
         else:
             logger.error(f"{response.status_code}: {response.text}")
-            return {}
-
-    async def get_ongoing_games(self) -> list[str]:
-        response = await self.get("/api/account/playing")
-        if response.status_code == 200:
-            return [game_info["gameId"] for game_info in response.json()["nowPlaying"]]
-        else:
-            logger.error(f"{response.status_code}: {response.text}")
-            return []
+            return False
 
     async def make_move(
         self, game_id: str, move: chess.Move, offer_draw: bool = False
@@ -206,8 +178,20 @@ class Lichess:
             logger.error(f"{response.status_code}: {response.text}")
             return False
 
-    async def upgrade_account(self) -> bool:
-        response = await self.post("/api/bot/account/upgrade")
+    async def create_challenge(
+        self, opponent: str, initial_time: int, increment: int = 0
+    ) -> bool:
+
+        response = await self.post(
+            f"/api/challenge/{opponent}",
+            data={
+                "rated": str(CONFIG["matchmaking"]["rated"]).lower(),
+                "clock.limit": initial_time,
+                "clock.increment": increment,
+                "variant": CONFIG["matchmaking"]["variant"],
+                "color": "random",
+            },
+        )
         if response.status_code == 200:
             return True
         else:

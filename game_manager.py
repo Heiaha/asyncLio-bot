@@ -50,7 +50,7 @@ class GameManager:
                     else None,
                 )
             except asyncio.TimeoutError:
-                if self.is_under_concurrency_limit():
+                if len(self.current_games) == 0:
                     await self.matchmaker.challenge()
             else:
                 self.event.clear()
