@@ -276,7 +276,6 @@ class Game:
 
     async def _play(self):
         self.start_time = time.monotonic()
-        abort_count = 0
         await self.start_engine()
         async for event in self.li.game_stream(self.id):
             event_type = GameEvent(event["type"])
@@ -310,13 +309,6 @@ class Game:
                     and time.monotonic() > self.start_time + CONFIG["abort_time"]
                 ):
                     await self.li.abort_game(self.id)
-                    abort_count += 1
-
-                    # If we've tried to abort the game three times and still haven't gotten back
-                    # a game event about the abort, just break out of the loop.
-                    if abort_count >= 3:
-                        self.status = GameStatus.ABORTED
-                        break
 
         # Just in case we've reached this stage unexpectedly.
         if not self.is_game_over:
@@ -325,8 +317,8 @@ class Game:
         logger.debug(f"{self.id} -- Quitting engine.")
         await self.engine.quit()
 
-        if self.move_task:
-            # Try to have the most recent move task exit gracefully and raise any exceptions before trying to cancel it.
+        # Try to have the remaining move task exit gracefully and raise any exceptions before possibly trying to cancel it.
+        if self.move_task is not None:
             try:
                 await asyncio.wait_for(self.move_task, timeout=60)
             except asyncio.TimeoutError:

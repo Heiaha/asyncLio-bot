@@ -41,26 +41,7 @@ class Lichess:
         backoff_log_level=logging.DEBUG,
         giveup_log_level=logging.ERROR,
     )
-    async def get(self, endpoint: str, **kwargs) -> httpx.Response:
-        return await self.client.get(endpoint, **kwargs)
-
-    @backoff.on_exception(
-        backoff.constant,
-        httpx.RequestError,  # non-HTTP status errors
-        max_time=60,
-        logger=logger,
-        backoff_log_level=logging.DEBUG,
-        giveup_log_level=logging.ERROR,
-    )
-    @backoff.on_predicate(
-        backoff.expo,
-        lambda response: response.status_code >= 500,
-        max_time=300,
-        logger=logger,
-        backoff_log_level=logging.DEBUG,
-        giveup_log_level=logging.ERROR,
-    )
-    async def post(self, endpoint: str, **kwargs) -> httpx.Response:
+    async def post(self, endpoint: str, **kwargs):
         return await self.client.post(endpoint, **kwargs)
 
     @backoff.on_exception(
@@ -113,76 +94,40 @@ class Lichess:
         except Exception as e:
             logger.error(e)
 
-    async def accept_challenge(self, challenge_id: str) -> bool:
-        response = await self.post(f"/api/challenge/{challenge_id}/accept")
-        if response.status_code == 200:
-            return True
-        else:
-            logger.error(f"{response.status_code}: {response.text}")
-            return False
+    async def accept_challenge(self, challenge_id: str) -> None:
+        await self.post(f"/api/challenge/{challenge_id}/accept")
 
     async def decline_challenge(
         self, challenge_id: str, *, reason: DeclineReason = DeclineReason.GENERIC
-    ) -> bool:
-        response = await self.post(
+    ) -> None:
+        await self.post(
             f"/api/challenge/{challenge_id}/decline", data={"reason": reason.value}
         )
-        if response.status_code == 200:
-            return True
-        else:
-            logger.error(f"{response.status_code}: {response.text}")
-            return False
 
-    async def cancel_challenge(self, challenge_id: str) -> bool:
-        response = await self.post(f"/api/challenge/{challenge_id}/cancel")
-        if response.status_code == 200:
-            return True
-        else:
-            logger.error(f"{response.status_code}: {response.text}")
-            return False
+    async def cancel_challenge(self, challenge_id: str) -> None:
+        await self.post(f"/api/challenge/{challenge_id}/cancel")
 
-    async def abort_game(self, game_id: str) -> bool:
-        response = await self.post(f"/api/bot/game/{game_id}/abort")
-        if response.status_code == 200:
-            return True
-        else:
-            logger.error(f"{response.status_code}: {response.text}")
-            return False
+    async def abort_game(self, game_id: str) -> None:
+        await self.post(f"/api/bot/game/{game_id}/abort")
 
-    async def resign_game(self, game_id: str) -> bool:
-        response = await self.post(f"/api/bot/game/{game_id}/resign")
-        if response.status_code == 200:
-            return True
-        else:
-            logger.error(f"{response.status_code}: {response.text}")
-            return False
+    async def resign_game(self, game_id: str) -> None:
+        await self.post(f"/api/bot/game/{game_id}/resign")
 
-    async def upgrade_account(self) -> bool:
-        response = await self.post("/api/bot/account/upgrade")
-        if response.status_code == 200:
-            return True
-        else:
-            logger.error(f"{response.status_code}: {response.text}")
-            return False
+    async def upgrade_account(self) -> None:
+        await self.post("/api/bot/account/upgrade")
 
     async def make_move(
         self, game_id: str, move: chess.Move, offer_draw: bool = False
-    ) -> bool:
-        response = await self.post(
+    ) -> None:
+        await self.post(
             f"/api/bot/game/{game_id}/move/{move.uci()}",
             params={"offeringDraw": str(offer_draw).lower()},
         )
-        if response.status_code == 200:
-            return True
-        else:
-            logger.error(f"{response.status_code}: {response.text}")
-            return False
 
     async def create_challenge(
         self, opponent: str, initial_time: int, increment: int = 0
-    ) -> bool:
-
-        response = await self.post(
+    ) -> None:
+        await self.post(
             f"/api/challenge/{opponent}",
             data={
                 "rated": str(CONFIG["matchmaking"]["rated"]).lower(),
@@ -192,8 +137,3 @@ class Lichess:
                 "color": "random",
             },
         )
-        if response.status_code == 200:
-            return True
-        else:
-            logger.error(f"{response.status_code}: {response.text}")
-            return False
