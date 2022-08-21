@@ -157,13 +157,11 @@ class Game:
 
     def format_result_message(self, event: dict) -> str:
 
-        winning_color = event.get("winner")
-        white_name, black_name = self.player_names
+        if winning_color := event.get("winner"):
+            white_name, black_name = self.player_names
+            winning_name = white_name if winning_color == "white" else black_name
+            losing_name = white_name if winning_color == "black" else black_name
 
-        winning_name = white_name if winning_color == "white" else black_name
-        losing_name = white_name if winning_color == "black" else black_name
-
-        if winning_color:
             message = f"{winning_name} won"
 
             if self.status == GameStatus.MATE:
