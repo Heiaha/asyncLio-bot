@@ -32,6 +32,7 @@ class Lichess:
         logger=logger,
         backoff_log_level=logging.WARNING,
         giveup_log_level=logging.ERROR,
+        raise_on_giveup=False,
     )
     @backoff.on_predicate(
         backoff.expo,
