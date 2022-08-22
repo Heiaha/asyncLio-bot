@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from collections import deque
 from typing import NoReturn
 
@@ -18,15 +19,23 @@ class GameManager:
         self.matchmaker: Matchmaker = Matchmaker(self.li)
         self.current_games: dict[str, Game] = {}
         self.challenge_queue: deque[str] = deque()
-        self.event: asyncio.Event = asyncio.Event()
+        self.last_event_time = time.monotonic()
 
     async def event_loop(self) -> NoReturn:
-        asyncio.create_task(self.challenge_loop())
         async for event in self.li.event_stream():
             event_type = Event(event["type"])
 
             if event_type == Event.PING:
                 self.clean_games()
+
+                if (
+                    CONFIG["matchmaking"]["enabled"]
+                    and len(self.current_games) == 0
+                    and time.monotonic()
+                    >= self.last_event_time + CONFIG["matchmaking"]["timeout"] * 60
+                ):
+                    self.last_event_time = time.monotonic()
+                    await self.matchmaker.challenge()
 
             elif event_type == Event.GAME_START:
                 await self.on_game_start(event)
@@ -40,27 +49,9 @@ class GameManager:
             elif event_type == Event.CHALLENGE_CANCELED:
                 self.on_challenge_canceled(event)
 
-    async def challenge_loop(self) -> NoReturn:
-        while True:
-            try:
-                await asyncio.wait_for(
-                    self.event.wait(),
-                    timeout=CONFIG["matchmaking"]["timeout"] * 60
-                    if CONFIG["matchmaking"]["enabled"]
-                    else None,
-                )
-            except asyncio.TimeoutError:
-                if len(self.current_games) == 0:
-                    await self.matchmaker.challenge()
-            else:
-                self.event.clear()
-                # Only accept one game per event.
-                if self.is_under_concurrency_limit() and self.challenge_queue:
-                    await self.li.accept_challenge(self.challenge_queue.popleft())
-
     async def on_game_start(self, event: dict) -> None:
+        self.last_event_time = time.monotonic()
         game_id = event["game"]["id"]
-        opponent = event["game"]["opponent"]["username"]
 
         # If this is an extremely late acceptance of a challenge we issued earlier
         # that would bring us over our concurrency limit, abort it.
@@ -72,11 +63,11 @@ class GameManager:
         game.start()  # non-blocking task creation
         self.current_games[game_id] = game
 
-        self.event.set()
         logger.info(f"Current Processes: {len(self.current_games)}.")
         logger.info(f"{game} starting.")
 
     async def on_game_finish(self, event: dict) -> None:
+        self.last_event_time = time.monotonic()
         if (game_id := event["game"]["id"]) in self.current_games:
             game = self.current_games.pop(game_id)
 
@@ -88,10 +79,13 @@ class GameManager:
 
             logger.info(f"{game} finished.")
 
-        self.event.set()
         logger.info(f"Current Processes: {len(self.current_games)}.")
 
+        if self.is_under_concurrency_limit() and self.challenge_queue:
+            await self.li.accept_challenge(self.challenge_queue.popleft())
+
     async def on_challenge(self, event: dict) -> None:
+        self.last_event_time = time.monotonic()
         challenge_id = event["challenge"]["id"]
         challenger_name = event["challenge"]["challenger"]["name"]
         if challenger_name == self.li.username:
@@ -104,8 +98,10 @@ class GameManager:
             )
             await self.li.decline_challenge(challenge_id, reason=decline_reason)
         else:
-            self.challenge_queue.append(challenge_id)
-            self.event.set()
+            if self.is_under_concurrency_limit():
+                await self.li.accept_challenge(challenge_id)
+            else:
+                self.challenge_queue.append(challenge_id)
 
     def on_challenge_canceled(self, event: dict) -> None:
         challenge_id = event["challenge"]["id"]
