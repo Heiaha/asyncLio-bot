@@ -38,16 +38,16 @@ async def main(args: argparse.Namespace) -> NoReturn:
 
     if args.upgrade:
         if li.title == "BOT":
-            logger.warning("Account is already a BOT.")
+            logger.warning(
+                f"{li.username} is already a BOT account. Run asyncLio-bot without the upgrade flag in the future."
+            )
         else:
-            if await li.upgrade_account():
-                logger.info("BOT upgrade successful.")
-            else:
-                logger.info("BOT upgrade failed.")
-        return
+            await li.upgrade_account()
+            logger.info(f"Upgraded {li.username} to a BOT account.")
+            return
 
     if li.title != "BOT":
-        logger.error("asyncLio-bot can only be used by BOT accounts.")
+        logger.critical("asyncLio-bot can only be used by BOT accounts.")
         return
 
     logger.info(f"Logged in as {li.title} {li.username}.")
