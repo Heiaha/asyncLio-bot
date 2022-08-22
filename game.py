@@ -76,16 +76,16 @@ class Game:
 
     def update(self, event: dict) -> bool:
         self.status = GameStatus(event["status"])
+        self.white_time = event["wtime"]
+        self.black_time = event["btime"]
+        self.white_inc = event["winc"]
+        self.black_inc = event["binc"]
 
         moves = event["moves"].split()
         if len(moves) <= len(self.board.move_stack):
             return False
 
         self.board = self.setup_board(moves)
-        self.white_time = event["wtime"]
-        self.black_time = event["btime"]
-        self.white_inc = event["winc"]
-        self.black_inc = event["binc"]
         return True
 
     def setup_board(self, moves: list[str] | None = None) -> chess.Board:
@@ -290,14 +290,14 @@ class Game:
                     self.move_task = asyncio.create_task(self.make_move())
 
             elif event_type == GameEvent.GAME_STATE:
-                updated = self.update(event)
+                board_updated = self.update(event)
 
                 if self.is_game_over:
                     message = self.format_result_message(event)
                     logger.info(message)
                     break
 
-                if self.is_our_turn and updated:
+                if self.is_our_turn and board_updated:
                     self.move_task = asyncio.create_task(self.make_move())
 
             elif event_type == GameEvent.PING:
