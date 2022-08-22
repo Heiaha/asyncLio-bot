@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 class GameManager:
     def __init__(self, li: Lichess) -> None:
         self.li: Lichess = li
-        self.matchmaker: Matchmaker = Matchmaker(self.li)
         self.current_games: dict[str, Game] = {}
         self.challenge_queue: deque[str] = deque()
         self.last_event_time = time.monotonic()
@@ -49,7 +48,7 @@ class GameManager:
             >= self.last_event_time + CONFIG["matchmaking"]["timeout"] * 60
         ):
             self.last_event_time = time.monotonic()
-            await self.matchmaker.challenge()
+            await Matchmaker(self.li).challenge()
 
     async def on_game_start(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
