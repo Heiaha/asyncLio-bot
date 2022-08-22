@@ -112,7 +112,9 @@ class GameManager:
         challenge_id = event["challenge"]["id"]
         challenger_name = event["challenge"]["challenger"]["name"]
         if challenge_id in self.challenge_queue:
-            logger.info(f"{challenge_id} -- Challenge cancelled from: {challenger_name}.")
+            logger.info(
+                f"{challenge_id} -- Challenge cancelled from: {challenger_name}."
+            )
             self.challenge_queue.remove(challenge_id)
 
     def is_under_concurrency_limit(self) -> bool:
