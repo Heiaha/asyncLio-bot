@@ -106,6 +106,7 @@ class GameManager:
                 self.challenge_queue.append(challenge_id)
 
     def on_challenge_canceled(self, event: dict) -> None:
+        self.last_event_time = time.monotonic()
         challenge_id = event["challenge"]["id"]
         challenger_name = event["challenge"]["challenger"]["name"]
         if challenge_id in self.challenge_queue:
