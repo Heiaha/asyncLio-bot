@@ -30,7 +30,7 @@ class Lichess:
         httpx.RequestError,  # non-HTTP status errors
         max_time=60,
         logger=logger,
-        backoff_log_level=logging.DEBUG,
+        backoff_log_level=logging.WARNING,
         giveup_log_level=logging.ERROR,
     )
     @backoff.on_predicate(
@@ -38,7 +38,7 @@ class Lichess:
         lambda response: response.status_code >= 500,
         max_time=300,
         logger=logger,
-        backoff_log_level=logging.DEBUG,
+        backoff_log_level=logging.WARNING,
         giveup_log_level=logging.ERROR,
     )
     async def post(self, endpoint: str, **kwargs):
@@ -46,10 +46,9 @@ class Lichess:
 
     @backoff.on_exception(
         backoff.constant,
-        httpx.HTTPError,
+        Exception,
         logger=logger,
-        backoff_log_level=logging.DEBUG,
-        giveup_log_level=logging.ERROR,
+        backoff_log_level=logging.WARNING,
     )
     async def event_stream(self) -> AsyncIterator[dict]:
         async with self.client.stream(
@@ -66,10 +65,9 @@ class Lichess:
 
     @backoff.on_exception(
         backoff.constant,
-        httpx.HTTPError,
+        Exception,
         logger=logger,
-        backoff_log_level=logging.DEBUG,
-        giveup_log_level=logging.ERROR,
+        backoff_log_level=logging.WARNING,
     )
     async def game_stream(self, game_id: str) -> AsyncIterator[dict]:
         async with self.client.stream(
@@ -117,7 +115,7 @@ class Lichess:
         await self.post("/api/bot/account/upgrade")
 
     async def make_move(
-        self, game_id: str, move: chess.Move, offer_draw: bool = False
+        self, game_id: str, move: chess.Move, *, offer_draw: bool = False
     ) -> None:
         await self.post(
             f"/api/bot/game/{game_id}/move/{move.uci()}",
