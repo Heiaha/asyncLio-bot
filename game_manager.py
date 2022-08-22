@@ -63,7 +63,7 @@ class GameManager:
         game.start()  # non-blocking task creation
         self.current_games[game_id] = game
 
-        logger.info(f"Current Games: {len(self.current_games)}.")
+        logger.info(f"Current number of games: {len(self.current_games)}.")
         logger.info(f"{game} starting.")
 
     async def on_game_finish(self, event: dict) -> None:
@@ -81,7 +81,7 @@ class GameManager:
 
             logger.info(f"{game} finished.")
 
-        logger.info(f"Current Games: {len(self.current_games)}.")
+        logger.info(f"Current number of games: {len(self.current_games)}.")
 
         if self.is_under_concurrency_limit() and self.challenge_queue:
             await self.li.accept_challenge(self.challenge_queue.popleft())
