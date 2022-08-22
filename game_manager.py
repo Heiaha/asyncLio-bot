@@ -111,10 +111,8 @@ class GameManager:
         self.last_event_time = time.monotonic()
         challenge_id = event["challenge"]["id"]
         challenger_name = event["challenge"]["challenger"]["name"]
+        logger.info(f"{challenge_id} -- Challenge cancelled from: {challenger_name}.")
         if challenge_id in self.challenge_queue:
-            logger.info(
-                f"{challenge_id} -- Challenge cancelled from: {challenger_name}."
-            )
             self.challenge_queue.remove(challenge_id)
 
     def is_under_concurrency_limit(self) -> bool:
