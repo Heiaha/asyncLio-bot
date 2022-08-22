@@ -42,13 +42,13 @@ class Bot:
 class Matchmaker:
     def __init__(self, li: Lichess) -> None:
         self.li: Lichess = li
-        self._me: Bot | None = None
+        self.me: Bot | None = None
 
     def _should_challenge(self, bot: Bot, perf_type: PerfType) -> bool:
-        if bot == self._me:
+        if bot == self.me:
             return False
         if (
-            abs(bot.rating(perf_type) - self._me.rating(perf_type))
+            abs(bot.rating(perf_type) - self.me.rating(perf_type))
             > CONFIG["matchmaking"]["max_rating_diff"]
         ):
             return False
@@ -67,7 +67,7 @@ class Matchmaker:
             async for info in self.li.get_online_bots()
             if not info.get("disabled")
         ]
-        self._me = next(bot for bot in bots if bot.name == self.li.username)
+        self.me = next(bot for bot in bots if bot.name == self.li.username)
         random.shuffle(bots)
 
         variant = Variant(CONFIG["matchmaking"]["variant"])
