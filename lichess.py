@@ -45,10 +45,7 @@ class Lichess:
         return await self.client.post(endpoint, **kwargs)
 
     @backoff.on_exception(
-        backoff.constant,
-        Exception,
-        logger=logger,
-        backoff_log_level=logging.WARNING,
+        backoff.constant, Exception, logger=logger, backoff_log_level=logging.WARNING,
     )
     async def event_stream(self) -> AsyncIterator[dict]:
         async with self.client.stream(
@@ -64,10 +61,7 @@ class Lichess:
                 yield event
 
     @backoff.on_exception(
-        backoff.constant,
-        Exception,
-        logger=logger,
-        backoff_log_level=logging.WARNING,
+        backoff.constant, Exception, logger=logger, backoff_log_level=logging.WARNING,
     )
     async def game_stream(self, game_id: str) -> AsyncIterator[dict]:
         async with self.client.stream(
