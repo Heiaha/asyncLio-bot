@@ -26,16 +26,7 @@ class GameManager:
             event_type = Event(event["type"])
 
             if event_type == Event.PING:
-                self.clean_games()
-
-                if (
-                    CONFIG["matchmaking"]["enabled"]
-                    and len(self.current_games) == 0
-                    and time.monotonic()
-                    >= self.last_event_time + CONFIG["matchmaking"]["timeout"] * 60
-                ):
-                    self.last_event_time = time.monotonic()
-                    await self.matchmaker.challenge()
+                await self.on_ping()
 
             elif event_type == Event.GAME_START:
                 await self.on_game_start(event)
@@ -48,6 +39,17 @@ class GameManager:
 
             elif event_type == Event.CHALLENGE_CANCELED:
                 self.on_challenge_canceled(event)
+
+    async def on_ping(self) -> None:
+        self.clean_games()
+        if (
+            CONFIG["matchmaking"]["enabled"]
+            and len(self.current_games) == 0
+            and time.monotonic()
+            >= self.last_event_time + CONFIG["matchmaking"]["timeout"] * 60
+        ):
+            self.last_event_time = time.monotonic()
+            await self.matchmaker.challenge()
 
     async def on_game_start(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
