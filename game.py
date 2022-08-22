@@ -270,9 +270,9 @@ class Game:
             await self.li.make_move(self.id, move, offer_draw=offer_draw)
 
     def start(self) -> None:
-        self.loop_task = asyncio.create_task(self._play())
+        self.loop_task = asyncio.create_task(self.watch_game_loop())
 
-    async def _play(self):
+    async def watch_game_loop(self):
         self.start_time = time.monotonic()
         await self.start_engine()
         async for event in self.li.game_stream(self.id):
@@ -293,8 +293,7 @@ class Game:
                 board_updated = self.update(event)
 
                 if self.is_game_over:
-                    message = self.format_result_message(event)
-                    logger.info(message)
+                    logger.info(self.format_result_message(event))
                     break
 
                 if self.is_our_turn and board_updated:

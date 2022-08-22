@@ -21,7 +21,7 @@ class GameManager:
         self.challenge_queue: deque[str] = deque()
         self.last_event_time = time.monotonic()
 
-    async def event_loop(self) -> NoReturn:
+    async def watch_event_loop(self) -> NoReturn:
         async for event in self.li.event_stream():
             event_type = Event(event["type"])
 

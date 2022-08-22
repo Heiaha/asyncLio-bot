@@ -52,7 +52,7 @@ async def main(args: argparse.Namespace) -> NoReturn:
 
     logger.info(f"Logged in as {li.title} {li.username}.")
 
-    await GameManager(li).event_loop()
+    await GameManager(li).watch_event_loop()
 
 
 if __name__ == "__main__":
