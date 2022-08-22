@@ -44,7 +44,7 @@ class Matchmaker:
         self.li: Lichess = li
         self.me: Bot | None = None
 
-    def _should_challenge(self, bot: Bot, perf_type: PerfType) -> bool:
+    def should_challenge(self, bot: Bot, perf_type: PerfType) -> bool:
         if bot == self.me:
             return False
         if (
@@ -80,7 +80,7 @@ class Matchmaker:
 
         for bot in bots:
 
-            if self._should_challenge(bot, perf_type):
+            if self.should_challenge(bot, perf_type):
                 logger.info(
                     f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds/60}+{tc_increment}."
                 )
