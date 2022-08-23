@@ -23,6 +23,11 @@ class Bot:
                 self._ratings[perf_type] = 1500
                 self._num_games[perf_type] = 0
 
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, Bot):
+            return self.name == other.name
+        return NotImplemented
+
     @property
     def total_games(self) -> int:
         return sum(self._num_games.values())
@@ -33,30 +38,24 @@ class Bot:
     def rating(self, perf_type) -> int:
         return self._ratings[perf_type]
 
-    def __eq__(self, other: Any) -> bool:
-        if isinstance(other, Bot):
-            return self.name == other.name
-        return NotImplemented
+    def should_challenge(self, other: "Bot", perf_type: PerfType):
+        if other == self:
+            return False
+        if (
+            abs(self.rating(perf_type) - other.rating(perf_type))
+            > CONFIG["matchmaking"]["max_rating_diff"]
+        ):
+            return False
+
+        if other.total_games < CONFIG["matchmaking"]["min_games"]:
+            return False
+
+        return True
 
 
 class Matchmaker:
     def __init__(self, li: Lichess) -> None:
         self.li: Lichess = li
-        self.me: Bot | None = None
-
-    def should_challenge(self, bot: Bot, perf_type: PerfType) -> bool:
-        if bot == self.me:
-            return False
-        if (
-            abs(bot.rating(perf_type) - self.me.rating(perf_type))
-            > CONFIG["matchmaking"]["max_rating_diff"]
-        ):
-            return False
-
-        if bot.total_games < CONFIG["matchmaking"]["min_games"]:
-            return False
-
-        return True
 
     async def challenge(self) -> None:
         if not CONFIG["matchmaking"]["enabled"]:
@@ -67,7 +66,7 @@ class Matchmaker:
             async for info in self.li.get_online_bots()
             if not info.get("disabled")
         ]
-        self.me = next(bot for bot in bots if bot.name == self.li.username)
+        me = next(bot for bot in bots if bot.name == self.li.username)
         random.shuffle(bots)
 
         variant = Variant(CONFIG["matchmaking"]["variant"])
@@ -80,7 +79,7 @@ class Matchmaker:
 
         for bot in bots:
 
-            if self.should_challenge(bot, perf_type):
+            if me.should_challenge(bot, perf_type):
                 logger.info(
                     f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds/60}+{tc_increment}."
                 )

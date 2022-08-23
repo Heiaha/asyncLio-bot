@@ -74,9 +74,7 @@ class GameManager:
 
             # await task here to return and output any potential errors, but don't let it close the event loop
             try:
-                await asyncio.wait_for(game.loop_task, timeout=10)
-            except asyncio.TimeoutError:
-                game.loop_task.cancel()
+                await game.loop_task
             except Exception as e:
                 logger.error(e)
 

@@ -30,14 +30,12 @@ class Game:
         self.board: chess.Board = self.setup_board()
 
         # attributes to be set up asynchronously or after the game starts
-        self.loop_task: asyncio.Task | None = None
-        self.move_task: asyncio.Task | None = None
-        self.start_time: float | None = None
-        self.white_time: int | None = None
-        self.black_time: int | None = None
-        self.white_inc: int | None = None
-        self.black_inc: int | None = None
+        self.white_clock: int = 0
+        self.black_clock: int = 0
+        self.white_inc: int = 0
+        self.black_inc: int = 0
         self.engine: chess.engine.UciProtocol | None = None
+        self.loop_task: asyncio.Task | None = None
 
     def __str__(self) -> str:
         white_name, black_name = self.player_names
@@ -76,8 +74,8 @@ class Game:
 
     def update(self, event: dict) -> bool:
         self.status = GameStatus(event["status"])
-        self.white_time = event["wtime"]
-        self.black_time = event["btime"]
+        self.white_clock = event["wtime"]
+        self.black_clock = event["btime"]
         self.white_inc = event["winc"]
         self.black_inc = event["binc"]
 
@@ -133,26 +131,15 @@ class Game:
         self, move: chess.Move, info: chess.engine.InfoDict
     ) -> str:
 
-        score_str = "Score: None"
-        if score := info.get("score"):
-            if moves_to_go := score.pov(self.color).mate():
-                score_str = f"Mate: {moves_to_go:+}"
-            elif (cp_score := score.pov(self.board.turn).score()) is not None:
-                score_str = f"CP Score: {cp_score:+}"
-
-        pv_str = "None"
-        if pv := info.get("pv"):
-            pv_str = self.board.variation_san(pv)
-
-        return "{id} -- Engine: {move_number}{ellipses:<4} {move:<10}{score:<20}Time: {time:<12.1f}Depth: {depth:<10}PV: {pv!s:<30}".format(
+        return "{id} -- Engine: {move_number}{ellipses} {move:<10}Score: {score!s:<10}Time: {time:<10.1f}Depth: {depth:<10}PV: {pv!s:<30}".format(
             id=self.id,
             move_number=self.board.fullmove_number,
             ellipses="." if self.board.turn == chess.WHITE else "...",
             move=self.board.san(move),
-            score=score_str,
+            score=score.pov(self.color) if (score := info.get("score")) else None,
             time=info.get("time", 0.0),
             depth=info.get("depth", 1),
-            pv=pv_str,
+            pv=self.board.variation_san(pv) if (pv := info.get("pv")) else None,
         )
 
     def format_result_message(self, event: dict) -> str:
@@ -187,12 +174,12 @@ class Game:
             message = "Game finish unknown."
         return f"{self.id} -- {message}"
 
-    def get_book_move(self) -> chess.Move | None:
+    def get_book_move(self) -> chess.Move:
         if not CONFIG["books"]["enabled"]:
-            return
+            return chess.Move.null()
 
         if self.board.ply() > CONFIG["books"].get("depth", 10):
-            return
+            return chess.Move.null()
 
         if self.board.uci_variant == "chess" and (
             standard_paths := CONFIG["books"].get("standard")
@@ -201,7 +188,7 @@ class Game:
         elif variant_paths := CONFIG["books"].get(self.board.uci_variant):
             books = variant_paths
         else:
-            return
+            return chess.Move.null()
 
         selection = BookSelection(CONFIG["books"]["selection"])
         board = self.board.copy()
@@ -221,34 +208,42 @@ class Game:
                     return move
                 board.pop()
 
+        return chess.Move.null()
+
     async def get_engine_move(self) -> tuple[chess.Move, chess.engine.InfoDict]:
         if len(self.board.move_stack) < 2:
             limit = chess.engine.Limit(time=10)
         else:
             limit = chess.engine.Limit(
-                white_clock=max(self.white_time - CONFIG.get("move_overhead", 0), 0)
+                white_clock=max(self.white_clock - CONFIG.get("move_overhead", 0), 0)
                 / 1000,
-                black_clock=max(self.black_time - CONFIG.get("move_overhead", 0), 0)
+                black_clock=max(self.black_clock - CONFIG.get("move_overhead", 0), 0)
                 / 1000,
                 white_inc=self.white_inc / 1000,
                 black_inc=self.black_inc / 1000,
             )
 
         result = await self.engine.play(self.board, limit, info=chess.engine.INFO_ALL)
-        if result.move:
-            score = result.info.get(
-                "score", chess.engine.PovScore(chess.engine.Mate(1), self.board.turn)
-            )
-            self.scores.append(score)
-            return result.move, result.info
 
-        raise RuntimeError("Engine could not make a move.")
+        if not result.move:
+            e = RuntimeError("Engine could not make a move.")
+            logger.error(e)
+            raise
+
+        if score := result.info.get("score"):
+            self.scores.append(score)
+        else:
+            self.scores.append(
+                chess.engine.PovScore(chess.engine.Mate(1), self.board.turn)
+            )
+
+        return result.move, result.info
 
     async def make_move(self) -> None:
         resign = False
         offer_draw = False
         if move := self.get_book_move():
-            message = f"{self.id} -- Book: {self.board.san(move)}"
+            message = f"{self.id} -- Book: {self.board.fullmove_number}{'.' if self.board.turn == chess.WHITE else '...'} {self.board.san(move)}"
         else:
             logger.info(f"{self.id} -- Searching for move from {self.board.fen()}.")
             move, info = await self.get_engine_move()
@@ -273,21 +268,18 @@ class Game:
         self.loop_task = asyncio.create_task(self.watch_game_loop())
 
     async def watch_game_loop(self):
-        self.start_time = time.monotonic()
         await self.start_engine()
+        start_time = time.monotonic()
+        move_tasks = []
         async for event in self.li.game_stream(self.id):
             event_type = GameEvent(event["type"])
 
             if event_type == GameEvent.GAME_FULL:
                 self.update(event["state"])
 
-                # Only make a move here if we haven't made a move yet and it's our turn.
-                if (
-                    self.is_our_turn
-                    and not self.is_game_over
-                    and self.move_task is None
-                ):
-                    self.move_task = asyncio.create_task(self.make_move())
+                # Only make a move here if it's our turn, and we haven't made a move since entering the loop.
+                if self.is_our_turn and not self.is_game_over and len(move_tasks) == 0:
+                    move_tasks.append(asyncio.create_task(self.make_move()))
 
             elif event_type == GameEvent.GAME_STATE:
                 board_updated = self.update(event)
@@ -297,13 +289,13 @@ class Game:
                     break
 
                 if self.is_our_turn and board_updated:
-                    self.move_task = asyncio.create_task(self.make_move())
+                    move_tasks.append(asyncio.create_task(self.make_move()))
 
             elif event_type == GameEvent.PING:
                 if (
                     len(self.board.move_stack) < 2
                     and not self.is_our_turn
-                    and time.monotonic() > self.start_time + CONFIG["abort_time"]
+                    and time.monotonic() > start_time + CONFIG["abort_time"]
                 ):
                     await self.li.abort_game(self.id)
 
@@ -313,14 +305,3 @@ class Game:
 
         logger.debug(f"{self.id} -- Quitting engine.")
         await self.engine.quit()
-
-        # Try to have the remaining move task exit gracefully and raise any exceptions before possibly trying to cancel it.
-        if self.move_task is not None:
-            try:
-                await asyncio.wait_for(self.move_task, timeout=60)
-            except asyncio.TimeoutError:
-                self.move_task.cancel()
-            except chess.engine.EngineTerminatedError:
-                pass
-            except Exception as e:
-                logger.error(e)
