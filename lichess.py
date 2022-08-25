@@ -5,7 +5,6 @@ from typing import AsyncIterator
 import backoff
 import chess
 import httpx
-import tenacity
 
 from config import CONFIG
 from enums import DeclineReason
