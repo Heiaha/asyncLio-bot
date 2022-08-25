@@ -22,7 +22,8 @@ class Lichess:
         self.title = user_info.get("title", "")
         headers["User-Agent"] = f"asyncLio-bot user:{self.username}"
         self.client = httpx.AsyncClient(
-            base_url="https://lichess.org", headers=headers,
+            base_url="https://lichess.org",
+            headers=headers,
         )
 
     @backoff.on_exception(
@@ -46,7 +47,10 @@ class Lichess:
         return await self.client.post(endpoint, **kwargs)
 
     @backoff.on_exception(
-        backoff.constant, Exception, logger=logger, backoff_log_level=logging.WARNING,
+        backoff.constant,
+        Exception,
+        logger=logger,
+        backoff_log_level=logging.WARNING,
     )
     async def event_stream(self) -> AsyncIterator[dict]:
         async with self.client.stream(
@@ -62,11 +66,16 @@ class Lichess:
                 yield event
 
     @backoff.on_exception(
-        backoff.constant, Exception, logger=logger, backoff_log_level=logging.WARNING,
+        backoff.constant,
+        Exception,
+        logger=logger,
+        backoff_log_level=logging.WARNING,
     )
     async def game_stream(self, game_id: str) -> AsyncIterator[dict]:
         async with self.client.stream(
-            "GET", f"/api/bot/game/stream/{game_id}", timeout=None,
+            "GET",
+            f"/api/bot/game/stream/{game_id}",
+            timeout=None,
         ) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():

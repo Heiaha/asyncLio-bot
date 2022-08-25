@@ -277,8 +277,12 @@ class Game:
             if event_type == GameEvent.GAME_FULL:
                 self.update(event["state"])
 
+                if self.is_game_over:
+                    logger.info(self.format_result_message(event["state"]))
+                    break
+
                 # Only make a move here if it's our turn, and we haven't made a move since entering the loop.
-                if self.is_our_turn and not self.is_game_over and len(move_tasks) == 0:
+                if self.is_our_turn and len(move_tasks) == 0:
                     move_tasks.append(asyncio.create_task(self.make_move()))
 
             elif event_type == GameEvent.GAME_STATE:
