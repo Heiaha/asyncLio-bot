@@ -5,6 +5,7 @@ from typing import AsyncIterator
 import backoff
 import chess
 import httpx
+import tenacity
 
 from config import CONFIG
 from enums import DeclineReason
@@ -46,45 +47,42 @@ class Lichess:
     async def post(self, endpoint: str, **kwargs):
         return await self.client.post(endpoint, **kwargs)
 
-    @backoff.on_exception(
-        backoff.constant,
-        Exception,
-        logger=logger,
-        backoff_log_level=logging.WARNING,
-    )
     async def event_stream(self) -> AsyncIterator[dict]:
-        async with self.client.stream(
-            "GET", "/api/stream/event", timeout=None
-        ) as response:
-            response.raise_for_status()
-            async for line in response.aiter_lines():
-                if line.strip():
-                    event = json.loads(line)
-                    logger.debug(f"Event: {event}")
-                else:
-                    event = {"type": "ping"}
-                yield event
+        while True:
+            try:
+                async with self.client.stream(
+                    "GET", "/api/stream/event", timeout=20
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if line.strip():
+                            event = json.loads(line)
+                            logger.debug(f"Event: {event}")
+                        else:
+                            event = {"type": "ping"}
+                        yield event
+            except Exception as e:
+                logger.warning(e)
 
-    @backoff.on_exception(
-        backoff.constant,
-        Exception,
-        logger=logger,
-        backoff_log_level=logging.WARNING,
-    )
     async def game_stream(self, game_id: str) -> AsyncIterator[dict]:
-        async with self.client.stream(
-            "GET",
-            f"/api/bot/game/stream/{game_id}",
-            timeout=None,
-        ) as response:
-            response.raise_for_status()
-            async for line in response.aiter_lines():
-                if line.strip():
-                    event = json.loads(line)
-                    logger.debug(f"Game event: {event}")
-                else:
-                    event = {"type": "ping"}
-                yield event
+        while True:
+            try:
+                async with self.client.stream(
+                    "GET",
+                    f"/api/bot/game/stream/{game_id}",
+                    timeout=20,
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if line.strip():
+                            event = json.loads(line)
+                            logger.debug(f"Game event: {event}")
+                        else:
+                            event = {"type": "ping"}
+                        yield event
+                return
+            except Exception as e:
+                logger.warning(e)
 
     async def get_online_bots(self) -> AsyncIterator[dict]:
         try:
