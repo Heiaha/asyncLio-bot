@@ -91,7 +91,7 @@ class Lichess:
                     bot = json.loads(line)
                     yield bot
         except Exception as e:
-            logger.error(e)
+            logger.warning(e)
 
     async def accept_challenge(self, challenge_id: str) -> None:
         await self.post(f"/api/challenge/{challenge_id}/accept")
