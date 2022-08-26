@@ -18,9 +18,10 @@ class Lichess:
             "Authorization": f"Bearer {CONFIG['token']}",
         }
         user_info = httpx.get("https://lichess.org/api/account", headers=headers).json()
+        headers["User-Agent"] = f"asyncLio-bot user:{user_info['username']}"
+
         self.username = user_info["username"]
         self.title = user_info.get("title", "")
-        headers["User-Agent"] = f"asyncLio-bot user:{self.username}"
         self.client = httpx.AsyncClient(
             base_url="https://lichess.org",
             headers=headers,
