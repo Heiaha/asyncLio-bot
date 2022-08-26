@@ -25,6 +25,7 @@ class Lichess:
         self.client = httpx.AsyncClient(
             base_url="https://lichess.org",
             headers=headers,
+            timeout=10,
         )
 
     @backoff.on_exception(
@@ -51,7 +52,8 @@ class Lichess:
         while True:
             try:
                 async with self.client.stream(
-                    "GET", "/api/stream/event", timeout=20
+                    "GET",
+                    "/api/stream/event",
                 ) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():
@@ -70,7 +72,6 @@ class Lichess:
                 async with self.client.stream(
                     "GET",
                     f"/api/bot/game/stream/{game_id}",
-                    timeout=20,
                 ) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():
