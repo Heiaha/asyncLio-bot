@@ -45,7 +45,7 @@ class Lichess:
         backoff_log_level=logging.WARNING,
         giveup_log_level=logging.ERROR,
     )
-    async def post(self, endpoint: str, **kwargs):
+    async def post(self, endpoint: str, **kwargs) -> httpx.Response:
         return await self.client.post(endpoint, **kwargs)
 
     async def event_stream(self) -> AsyncIterator[dict]:

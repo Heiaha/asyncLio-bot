@@ -63,7 +63,9 @@ class GameManager:
         game.start()  # non-blocking task creation
         self.current_games[game_id] = game
 
-        logger.info(f"Current number of games: {len(self.current_games)}.")
+        logger.info(
+            f"Current number of games: {len(self.current_games)}. Current number of challenges: {len(self.challenge_queue)}."
+        )
         logger.info(f"{game} starting.")
 
     async def on_game_finish(self, event: dict) -> None:
@@ -79,7 +81,9 @@ class GameManager:
 
             logger.info(f"{game} finished.")
 
-        logger.info(f"Current number of games: {len(self.current_games)}.")
+        logger.info(
+            f"Current number of games: {len(self.current_games)}. Current number of challenges: {len(self.challenge_queue)}."
+        )
 
         if self.is_under_concurrency_limit() and self.challenge_queue:
             await self.li.accept_challenge(self.challenge_queue.popleft())
@@ -102,6 +106,9 @@ class GameManager:
                 await self.li.accept_challenge(challenge_id)
             else:
                 self.challenge_queue.append(challenge_id)
+                logger.info(
+                    f"Current number of games: {len(self.current_games)}. Current number of challenges: {len(self.challenge_queue)}."
+                )
 
     def on_challenge_canceled(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
@@ -110,6 +117,9 @@ class GameManager:
         logger.info(f"{challenge_id} -- Challenge cancelled from: {challenger_name}.")
         if challenge_id in self.challenge_queue:
             self.challenge_queue.remove(challenge_id)
+        logger.info(
+            f"Current number of games: {len(self.current_games)}. Current number of challenges: {len(self.challenge_queue)}."
+        )
 
     def is_under_concurrency_limit(self) -> bool:
         return len(self.current_games) < CONFIG["concurrency"]
