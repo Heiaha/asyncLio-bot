@@ -53,7 +53,7 @@ async def main(args: argparse.Namespace) -> NoReturn:
     logger.info(f"Logged in as {li.title} {li.username}.")
 
     try:
-        await GameManager(li).watch_event_loop()
+        await GameManager(li).watch_event_stream()
     finally:
         await li.client.aclose()
 

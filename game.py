@@ -265,9 +265,9 @@ class Game:
             await self.li.make_move(self.id, move, offer_draw=offer_draw)
 
     def start(self) -> None:
-        self.loop_task = asyncio.create_task(self.watch_game_loop())
+        self.loop_task = asyncio.create_task(self.watch_game_stream())
 
-    async def watch_game_loop(self):
+    async def watch_game_stream(self):
         await self.start_engine()
         start_time = time.monotonic()
         move_tasks = []
