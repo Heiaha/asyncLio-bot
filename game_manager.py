@@ -101,14 +101,16 @@ class GameManager:
                 f"{challenge_id} -- Declining challenge from {challenger_name} for reason: {decline_reason}."
             )
             await self.li.decline_challenge(challenge_id, reason=decline_reason)
-        else:
-            if self.is_under_concurrency_limit():
-                await self.li.accept_challenge(challenge_id)
-            else:
-                self.challenge_queue.append(challenge_id)
-                logger.info(
-                    f"Games: {len(self.current_games)}. Challenges: {len(self.challenge_queue)}."
-                )
+            return
+
+        if self.is_under_concurrency_limit():
+            await self.li.accept_challenge(challenge_id)
+            return
+
+        self.challenge_queue.append(challenge_id)
+        logger.info(
+            f"Games: {len(self.current_games)}. Challenges: {len(self.challenge_queue)}."
+        )
 
     def on_challenge_canceled(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
