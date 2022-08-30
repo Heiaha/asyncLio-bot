@@ -27,13 +27,15 @@ class Game:
         self.variant: Variant = Variant(event["game"]["variant"]["key"])
         self.status: GameStatus = GameStatus.CREATED
         self.scores: list[chess.engine.PovScore] = []
-        self.board: chess.Board = self.setup_board()
+        self.board: chess.Board = self.make_board()
 
         # attributes to be set up asynchronously or after the game starts
-        self.white_clock: int = 0
-        self.black_clock: int = 0
-        self.white_inc: int = 0
-        self.black_inc: int = 0
+        self.clock: dict[str, float] = {
+            "white_clock": 0,
+            "black_clock": 0,
+            "white_inc": 0,
+            "black_inc": 0,
+        }
         self.engine: chess.engine.UciProtocol | None = None
         self.loop_task: asyncio.Task | None = None
 
@@ -74,19 +76,24 @@ class Game:
 
     def update(self, event: dict) -> bool:
         self.status = GameStatus(event["status"])
-        self.white_clock = event["wtime"]
-        self.black_clock = event["btime"]
-        self.white_inc = event["winc"]
-        self.black_inc = event["binc"]
+
+        self.clock["white_clock"] = (
+            max(event["wtime"] - CONFIG.get("move_overhead", 0), 0) / 1000
+        )
+        self.clock["black_clock"] = (
+            max(event["wtime"] - CONFIG.get("move_overhead", 0), 0) / 1000
+        )
+        self.clock["white_inc"] = event["winc"] / 1000
+        self.clock["black_inc"] = event["binc"] / 1000
 
         moves = event["moves"].split()
         if len(moves) <= len(self.board.move_stack):
             return False
 
-        self.board = self.setup_board(moves)
+        self.board = self.make_board(moves)
         return True
 
-    def setup_board(self, moves: list[str] | None = None) -> chess.Board:
+    def make_board(self, moves: list[str] | None = None) -> chess.Board:
         if self.variant == Variant.CHESS960:
             board = chess.Board(self.initial_fen, chess960=True)
         elif self.variant == Variant.FROM_POSITION:
@@ -127,10 +134,17 @@ class Game:
             for score in self.scores[-CONFIG["resign"]["moves"] :]
         )
 
+    def format_book_move_message(self, move: chess.Move) -> str:
+        return "{id} -- Book: {move_number}{ellipses} {move}".format(
+            id=self.id,
+            move_number=self.board.fullmove_number,
+            ellipses="." if self.board.turn == chess.WHITE else "...",
+            move=self.board.san(move),
+        )
+
     def format_engine_move_message(
         self, move: chess.Move, info: chess.engine.InfoDict
     ) -> str:
-
         return "{id} -- Engine: {move_number}{ellipses} {move:<10}Score: {score!s:<10}Time: {time:<10.1f}Depth: {depth:<10}PV: {pv!s:<30}".format(
             id=self.id,
             move_number=self.board.fullmove_number,
@@ -174,21 +188,21 @@ class Game:
             message = "Game finish unknown."
         return f"{self.id} -- {message}"
 
-    def get_book_move(self) -> chess.Move:
+    def get_book_move(self) -> chess.Move | None:
         if not CONFIG["books"]["enabled"]:
-            return chess.Move.null()
+            return
 
         if self.board.ply() > CONFIG["books"].get("depth", 10):
-            return chess.Move.null()
+            return
 
-        if self.board.uci_variant == "chess" and (
+        if self.variant in (Variant.STANDARD, Variant.FROM_POSITION) and (
             standard_paths := CONFIG["books"].get("standard")
         ):
             books = standard_paths
-        elif variant_paths := CONFIG["books"].get(self.board.uci_variant):
+        elif variant_paths := CONFIG["books"].get(self.variant.value):
             books = variant_paths
         else:
-            return chess.Move.null()
+            return
 
         selection = BookSelection(CONFIG["books"]["selection"])
         board = self.board.copy()
@@ -205,64 +219,61 @@ class Game:
                     continue
                 board.push(move)
                 if not board.is_repetition(count=2):
+                    logger.info(self.format_book_move_message(move))
                     return move
                 board.pop()
 
-        return chess.Move.null()
-
     async def get_engine_move(self) -> tuple[chess.Move, chess.engine.InfoDict]:
-        if len(self.board.move_stack) < 2:
-            limit = chess.engine.Limit(time=10)
-        else:
-            limit = chess.engine.Limit(
-                white_clock=max(self.white_clock - CONFIG.get("move_overhead", 0), 0)
-                / 1000,
-                black_clock=max(self.black_clock - CONFIG.get("move_overhead", 0), 0)
-                / 1000,
-                white_inc=self.white_inc / 1000,
-                black_inc=self.black_inc / 1000,
-            )
+        limit = (
+            chess.engine.Limit(**self.clock)
+            if len(self.board.move_stack) >= 2
+            else chess.engine.Limit(time=10)
+        )
 
-        result = await self.engine.play(self.board, limit, info=chess.engine.INFO_ALL)
+        logger.info(f"{self.id} -- Searching for move from {self.board.fen()}.")
+
+        result = await self.engine.play(
+            self.board, limit=limit, info=chess.engine.INFO_ALL
+        )
 
         if not result.move:
-            e = RuntimeError("Engine could not make a move.")
-            logger.error(e)
-            raise
+            raise RuntimeError(f"{self.id} -- Engine could not make a move.")
 
-        if score := result.info.get("score"):
-            self.scores.append(score)
-        else:
-            self.scores.append(
-                chess.engine.PovScore(chess.engine.Mate(1), self.board.turn)
-            )
+        self.scores.append(
+            score
+            if (score := result.info.get("score"))
+            else chess.engine.PovScore(chess.engine.Mate(1), self.board.turn)
+        )
+
+        logger.info(self.format_engine_move_message(result.move, result.info))
 
         return result.move, result.info
 
     async def make_move(self) -> None:
-        resign = False
-        offer_draw = False
-        if move := self.get_book_move():
-            message = f"{self.id} -- Book: {self.board.fullmove_number}{'.' if self.board.turn == chess.WHITE else '...'} {self.board.san(move)}"
-        else:
-            logger.info(f"{self.id} -- Searching for move from {self.board.fen()}.")
-            move, info = await self.get_engine_move()
-            message = self.format_engine_move_message(move, info)
-            resign = self.should_resign()
-            offer_draw = self.should_draw()
 
-        logger.info(message)
+        move = self.get_book_move()
+        if not move:
+            try:
+                move, info = await self.get_engine_move()
+            except RuntimeError as e:
+                # We may get a chess.engine.EngineTerminatedError if the game ends while searching.
+                # If that's the case, don't log it as an error.
+                if not self.is_game_over:
+                    logger.error(f"{self.id} -- {e}")
+                return
 
         if self.is_game_over:
             return
 
-        if resign:
+        if self.should_resign():
             logger.info(f"{self.id} -- Resigning game.")
             await self.li.resign_game(self.id)
-        else:
-            if offer_draw:
-                logger.info(f"{self.id} -- Offering draw.")
-            await self.li.make_move(self.id, move, offer_draw=offer_draw)
+            return
+
+        if offer_draw := self.should_draw():
+            logger.info(f"{self.id} -- Offering draw.")
+
+        await self.li.make_move(self.id, move, offer_draw=offer_draw)
 
     def start(self) -> None:
         self.loop_task = asyncio.create_task(self.watch_game_stream())
