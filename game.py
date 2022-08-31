@@ -77,14 +77,17 @@ class Game:
     def update(self, event: dict) -> bool:
         self.status = GameStatus(event["status"])
 
-        self.clock["white_clock"] = (
-            max(event["wtime"] - CONFIG.get("move_overhead", 0), 0) / 1000
+        self.clock = {
+            "white_clock": event["wtime"] / 1000,
+            "black_clock": event["btime"] / 1000,
+            "white_inc": event["winc"] / 1000,
+            "black_inc": event["binc"] / 1000,
+        }
+
+        wb = "white" if self.color == chess.WHITE else "black"
+        self.clock[f"{wb}_clock"] = max(
+            0, self.clock[f"{wb}_clock"] - CONFIG.get("move_overhead", 0) / 1000
         )
-        self.clock["black_clock"] = (
-            max(event["wtime"] - CONFIG.get("move_overhead", 0), 0) / 1000
-        )
-        self.clock["white_inc"] = event["winc"] / 1000
-        self.clock["black_inc"] = event["binc"] / 1000
 
         moves = event["moves"].split()
         if len(moves) <= len(self.board.move_stack):
@@ -158,10 +161,10 @@ class Game:
 
     def format_result_message(self, event: dict) -> str:
 
-        if winning_color := event.get("winner"):
+        if wb_winner := event.get("winner"):
             white_name, black_name = self.player_names
-            winning_name = white_name if winning_color == "white" else black_name
-            losing_name = white_name if winning_color == "black" else black_name
+            winning_name = white_name if wb_winner == "white" else black_name
+            losing_name = white_name if wb_winner == "black" else black_name
 
             message = f"{winning_name} won"
 
@@ -224,6 +227,7 @@ class Game:
                 board.pop()
 
     async def get_engine_move(self) -> tuple[chess.Move, chess.engine.InfoDict]:
+
         limit = (
             chess.engine.Limit(**self.clock)
             if len(self.board.move_stack) >= 2
