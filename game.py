@@ -198,13 +198,13 @@ class Game:
         if self.board.ply() > CONFIG["books"].get("depth", 10):
             return
 
-        if self.variant in (Variant.STANDARD, Variant.FROM_POSITION) and (
-            standard_paths := CONFIG["books"].get("standard")
-        ):
-            books = standard_paths
-        elif variant_paths := CONFIG["books"].get(self.variant.value):
-            books = variant_paths
-        else:
+        books = CONFIG["books"].get(
+            Variant.STANDARD.value
+            if self.variant == Variant.FROM_POSITION
+            else self.variant.value
+        )
+
+        if not books:
             return
 
         selection = BookSelection(CONFIG["books"]["selection"])
