@@ -23,8 +23,14 @@ class Lichess:
         self.username = user_info["username"]
         self.title = user_info.get("title", "")
         self.client = httpx.AsyncClient(
-            base_url="https://lichess.org", headers=headers, timeout=10,
+            base_url="https://lichess.org",
+            headers=headers,
+            timeout=10,
         )
+
+    @property
+    def me(self):
+        return f"{self.title} {self.username}"
 
     @backoff.on_exception(
         backoff.constant,
@@ -49,7 +55,10 @@ class Lichess:
     async def event_stream(self) -> AsyncIterator[dict]:
         while True:
             try:
-                async with self.client.stream("GET", "/api/stream/event",) as response:
+                async with self.client.stream(
+                    "GET",
+                    "/api/stream/event",
+                ) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():
                         if line.strip():
@@ -65,7 +74,8 @@ class Lichess:
         while True:
             try:
                 async with self.client.stream(
-                    "GET", f"/api/bot/game/stream/{game_id}",
+                    "GET",
+                    f"/api/bot/game/stream/{game_id}",
                 ) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():

@@ -41,18 +41,14 @@ class Game:
 
     def __str__(self) -> str:
         white_name, black_name = self.player_names
-        return f"{self.id} -- {white_name} v. {black_name}"
-
-    @property
-    def me(self) -> str:
-        return f"{self.li.title} {self.li.username}"
+        return f"{self.id} -- {self.variant}: {white_name} v. {black_name}"
 
     @property
     def player_names(self) -> tuple[str, str]:
         if self.color == chess.WHITE:
-            return self.me, self.opponent
+            return self.li.me, self.opponent
         elif self.color == chess.BLACK:
-            return self.opponent, self.me
+            return self.opponent, self.li.me
         raise ValueError("Colors unknown.")
 
     @property
