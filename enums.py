@@ -48,6 +48,9 @@ class Variant(Enum):
     RACING_KINGS = "racingKings"
     THREE_CHECK = "threeCheck"
 
+    def __str__(self):
+        return re.sub("([A-Z])", r" \1", self.value).title()
+
 
 class PerfType(Enum):
     BULLET = "bullet"
@@ -62,6 +65,9 @@ class PerfType(Enum):
     KING_OF_THE_HILL = "kingOfTheHill"
     RACING_KINGS = "racingKings"
     THREE_CHECK = "threeCheck"
+
+    def __str__(self):
+        return re.sub("([A-Z])", r" \1", self.value).title()
 
     @classmethod
     def from_standard_tc(cls, tc_seconds: int, tc_increment: int = 0) -> "PerfType":
@@ -104,7 +110,7 @@ class DeclineReason(Enum):
     ONLY_BOT = "onlyBot"
 
     def __str__(self):
-        return re.sub(r"(\w)([A-Z])", r"\1 \2", self.value).lower()
+        return re.sub("([A-Z])", r" \1", self.value).lower()
 
     @classmethod
     def from_event(cls, event: dict) -> "DeclineReason":
