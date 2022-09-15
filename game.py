@@ -222,7 +222,7 @@ class Game:
                     return move
                 board.pop()
 
-    async def get_engine_move(self) -> tuple[chess.Move, chess.engine.InfoDict]:
+    async def get_engine_move(self) -> chess.Move:
 
         limit = (
             chess.engine.Limit(**self.clock)
@@ -247,14 +247,14 @@ class Game:
 
         logger.info(self.format_engine_move_message(result.move, result.info))
 
-        return result.move, result.info
+        return result.move
 
     async def make_move(self) -> None:
 
         move = self.get_book_move()
         if not move:
             try:
-                move, info = await self.get_engine_move()
+                move = await self.get_engine_move()
             except RuntimeError as e:
                 # We may get a chess.engine.EngineTerminatedError if the game ends while searching.
                 # If that's the case, don't log it as an error.
