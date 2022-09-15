@@ -64,7 +64,7 @@ class Matchmaker:
         bots = [
             Bot(info)
             async for info in self.li.get_online_bots()
-            if not info.get("disabled")
+            if not info.get("disabled") and not info.get("tosViolation")
         ]
         me = next(bot for bot in bots if bot.name == self.li.username)
         random.shuffle(bots)
