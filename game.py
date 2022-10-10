@@ -252,8 +252,8 @@ class Game:
 
     async def make_move(self) -> None:
 
-        if self.should_use_book():
-            move = self.get_book_move()
+        if self.should_use_book() and (book_move := self.get_book_move()):
+            move = book_move
         else:
             try:
                 move = await self.get_engine_move()
