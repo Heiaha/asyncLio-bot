@@ -191,7 +191,7 @@ class Game:
         if not CONFIG["books"]["enabled"]:
             return False
 
-        return self.board.ply() > CONFIG["books"].get("depth", 10)
+        return self.board.ply() <= CONFIG["books"].get("depth", 10)
 
     def get_book_move(self) -> chess.Move | None:
         books = CONFIG["books"].get(
