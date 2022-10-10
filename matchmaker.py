@@ -58,9 +58,6 @@ class Matchmaker:
         self.li: Lichess = li
 
     async def challenge(self) -> None:
-        if not CONFIG["matchmaking"]["enabled"]:
-            return
-
         bots = [
             Bot(info)
             async for info in self.li.get_online_bots()

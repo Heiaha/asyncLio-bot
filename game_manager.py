@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 class GameManager:
     def __init__(self, li: Lichess) -> None:
         self.li: Lichess = li
+        self.matchmaker = Matchmaker(li)
         self.current_games: dict[str, Game] = {}
         self.challenge_queue: deque[str] = deque()
         self.last_event_time = time.monotonic()
@@ -40,14 +41,9 @@ class GameManager:
 
     async def on_ping(self) -> None:
         self.clean_games()
-        if (
-            CONFIG["matchmaking"]["enabled"]
-            and len(self.current_games) == 0
-            and time.monotonic()
-            >= self.last_event_time + CONFIG["matchmaking"]["timeout"] * 60
-        ):
+        if self.should_create_challenge():
             self.last_event_time = time.monotonic()
-            await Matchmaker(self.li).challenge()
+            await self.matchmaker.challenge()
 
     async def on_game_start(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
@@ -125,6 +121,18 @@ class GameManager:
 
     def is_under_concurrency_limit(self) -> bool:
         return len(self.current_games) < CONFIG["concurrency"]
+
+    def should_create_challenge(self) -> bool:
+        if not CONFIG["matchmaking"]["enabled"]:
+            return False
+
+        if len(self.current_games) != 0:
+            return False
+
+        return (
+            time.monotonic() - self.last_event_time
+            >= max(1, CONFIG["matchmaking"]["timeout"]) * 60
+        )
 
     def clean_games(self) -> None:
         # Sometimes the lichess game loop seems to close without the event loop sending a "gameFinish" event

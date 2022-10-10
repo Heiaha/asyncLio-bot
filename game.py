@@ -187,13 +187,13 @@ class Game:
             message = "Game finish unknown."
         return f"{self.id} -- {message}"
 
-    def get_book_move(self) -> chess.Move | None:
+    def should_use_book(self):
         if not CONFIG["books"]["enabled"]:
-            return
+            return False
 
-        if self.board.ply() > CONFIG["books"].get("depth", 10):
-            return
+        return self.board.ply() > CONFIG["books"].get("depth", 10)
 
+    def get_book_move(self) -> chess.Move | None:
         books = CONFIG["books"].get(
             Variant.STANDARD.value
             if self.variant == Variant.FROM_POSITION
@@ -201,7 +201,7 @@ class Game:
         )
 
         if not books:
-            return
+            return None
 
         selection = BookSelection(CONFIG["books"]["selection"])
         board = self.board.copy()
@@ -221,6 +221,7 @@ class Game:
                     logger.info(self.format_book_move_message(move))
                     return move
                 board.pop()
+        return None
 
     async def get_engine_move(self) -> chess.Move:
 
@@ -251,12 +252,13 @@ class Game:
 
     async def make_move(self) -> None:
 
-        move = self.get_book_move()
-        if not move:
+        if self.should_use_book():
+            move = self.get_book_move()
+        else:
             try:
                 move = await self.get_engine_move()
             except RuntimeError as e:
-                # We may get a chess.engine.EngineTerminatedError if the game ends while searching.
+                # We may get a chess.engine.EngineTerminatedError if the game ends (and engine is quit) while searching.
                 # If that's the case, don't log it as an error.
                 if not self.is_game_over:
                     logger.error(f"{self.id} -- {e}")
@@ -278,10 +280,10 @@ class Game:
     def start(self) -> None:
         self.loop_task = asyncio.create_task(self.watch_game_stream())
 
-    async def watch_game_stream(self):
-        await self.start_engine()
+    async def watch_game_stream(self) -> None:
         start_time = time.monotonic()
         move_tasks = []
+        await self.start_engine()
         async for event in self.li.game_stream(self.id):
             event_type = GameEvent(event["type"])
 
