@@ -218,20 +218,17 @@ class Game:
                     continue
                 board.push(move)
                 if not board.is_repetition(count=2):
-                    logger.info(self.format_book_move_message(move))
                     return move
                 board.pop()
         return None
 
-    async def get_engine_move(self) -> chess.Move:
+    async def get_engine_move(self) -> (chess.Move, chess.engine.InfoDict):
 
         limit = (
             chess.engine.Limit(**self.clock)
             if len(self.board.move_stack) >= 2
             else chess.engine.Limit(time=10)
         )
-
-        logger.info(f"{self.id} -- Searching for move from {self.board.fen()}.")
 
         result = await self.engine.play(
             self.board, limit=limit, info=chess.engine.INFO_ALL
@@ -246,17 +243,16 @@ class Game:
             else chess.engine.PovScore(chess.engine.Mate(1), self.board.turn)
         )
 
-        logger.info(self.format_engine_move_message(result.move, result.info))
-
-        return result.move
+        return result.move, result.info
 
     async def make_move(self) -> None:
-
-        if self.should_use_book() and (book_move := self.get_book_move()):
-            move = book_move
+        logger.info(f"{self.id} -- Searching for move from {self.board.fen()}.")
+        if self.should_use_book() and (move := self.get_book_move()):
+            logger.info(self.format_book_move_message(move))
         else:
             try:
-                move = await self.get_engine_move()
+                move, info = await self.get_engine_move()
+                logger.info(self.format_engine_move_message(move, info))
             except RuntimeError as e:
                 # We may get a chess.engine.EngineTerminatedError if the game ends (and engine is quit) while searching.
                 # If that's the case, don't log it as an error.
