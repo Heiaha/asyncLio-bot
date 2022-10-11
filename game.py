@@ -308,7 +308,7 @@ class Game:
                 if (
                     len(self.board.move_stack) < 2
                     and not self.is_our_turn
-                    and time.monotonic() > start_time + CONFIG["abort_time"]
+                    and time.monotonic() - start_time >= CONFIG["abort_time"]
                 ):
                     await self.li.abort_game(self.id)
 
