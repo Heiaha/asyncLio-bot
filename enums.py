@@ -34,6 +34,7 @@ class GameEvent(Enum):
     GAME_FULL = "gameFull"
     GAME_STATE = "gameState"
     CHAT_LINE = "chatLine"
+    OPPONENT_GONE = "opponentGone"
 
 
 class Variant(Enum):
