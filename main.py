@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import logging
-from argparse import ArgumentParser
 from typing import NoReturn
 
 import chess.engine
@@ -59,7 +58,7 @@ async def main(args: argparse.Namespace) -> NoReturn:
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--upgrade", "-u", action="store_true", help="Upgrade account to BOT account."
     )
