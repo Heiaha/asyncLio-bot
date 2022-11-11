@@ -80,9 +80,9 @@ class Game:
             "black_inc": event["binc"] / 1000,
         }
 
-        wb = "white" if self.color == chess.WHITE else "black"
-        self.clock[f"{wb}_clock"] = max(
-            0, self.clock[f"{wb}_clock"] - CONFIG.get("move_overhead", 0) / 1000
+        clock_name = "white_clock" if self.color == chess.WHITE else "black_clock"
+        self.clock[clock_name] = max(
+            0, self.clock[clock_name] - CONFIG.get("move_overhead", 0) / 1000
         )
 
         moves = event["moves"].split()
