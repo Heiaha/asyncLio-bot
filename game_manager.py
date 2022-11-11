@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 class GameManager:
     def __init__(self, li: Lichess) -> None:
         self.li: Lichess = li
-        self.matchmaker = Matchmaker(li)
+        self.matchmaker: Matchmaker = Matchmaker(li)
         self.current_games: dict[str, Game] = {}
         self.challenge_queue: deque[str] = deque()
-        self.last_event_time = time.monotonic()
+        self.last_event_time: float = time.monotonic()
 
     async def watch_event_stream(self) -> NoReturn:
         async for event in self.li.event_stream():

@@ -20,9 +20,9 @@ class Lichess:
         user_info = httpx.get("https://lichess.org/api/account", headers=headers).json()
         headers["User-Agent"] = f"asyncLio-bot user:{user_info['username']}"
 
-        self.username = user_info["username"]
-        self.title = user_info.get("title", "")
-        self.client = httpx.AsyncClient(
+        self.username: str = user_info["username"]
+        self.title: str = user_info.get("title", "")
+        self.client: httpx.AsyncClient = httpx.AsyncClient(
             base_url="https://lichess.org", headers=headers, timeout=10,
         )
 
