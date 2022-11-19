@@ -111,8 +111,7 @@ class GameManager:
     def on_challenge_canceled(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
         challenge_id = event["challenge"]["id"]
-        challenger_name = event["challenge"]["challenger"]["name"]
-        logger.info(f"{challenge_id} -- Challenge cancelled from: {challenger_name}.")
+        logger.info(f"{challenge_id} -- Challenge cancelled.")
         if challenge_id in self.challenge_queue:
             self.challenge_queue.remove(challenge_id)
         logger.info(
