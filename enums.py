@@ -138,7 +138,11 @@ class DeclineReason(Enum):
         if variant not in allowed_variants:
             return cls.VARIANT
 
-        is_bot = event["challenge"]["challenger"]["title"] == "BOT"
+        if challenger_info := event["challenge"]["challenger"]:
+            is_bot = challenger_info["title"] == "BOT"
+        else:
+            is_bot = False
+
         if is_bot and "bot" not in allowed_opponents:
             return cls.NO_BOT
 

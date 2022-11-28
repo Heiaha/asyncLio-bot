@@ -87,7 +87,12 @@ class GameManager:
     async def on_challenge(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
         challenge_id = event["challenge"]["id"]
-        challenger_name = event["challenge"]["challenger"]["name"]
+
+        if challenger_info := event["challenge"]["challenger"]:
+            challenger_name = challenger_info["name"]
+        else:
+            challenger_name = "Anonymous"
+
         if challenger_name == self.li.username:
             return
 
