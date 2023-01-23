@@ -80,11 +80,6 @@ class Game:
             "black_inc": event["binc"] / 1000,
         }
 
-        clock_name = "white_clock" if self.color == chess.WHITE else "black_clock"
-        self.clock[clock_name] = max(
-            0, self.clock[clock_name] - CONFIG.get("move_overhead", 0) / 1000
-        )
-
         moves = event["moves"].split()
         if len(moves) <= len(self.board.move_stack):
             return False
@@ -224,8 +219,15 @@ class Game:
 
     async def get_engine_move(self) -> (chess.Move, chess.engine.InfoDict):
 
+        clock = self.clock.copy()
+
+        clock_name = "white_clock" if self.color == chess.WHITE else "black_clock"
+        clock[clock_name] = max(
+            0, clock[clock_name] - CONFIG.get("move_overhead", 0) / 1000
+        )
+
         limit = (
-            chess.engine.Limit(**self.clock)
+            chess.engine.Limit(**clock)
             if len(self.board.move_stack) >= 2
             else chess.engine.Limit(time=10)
         )
