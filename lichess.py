@@ -1,5 +1,7 @@
+import asyncio
 import json
 import logging
+import random
 from typing import AsyncIterator
 
 import backoff
@@ -63,7 +65,11 @@ class Lichess:
                             event = {"type": "ping"}
                         yield event
             except Exception as e:
-                logger.warning(e)
+                sleep_time = random.random()
+                logger.warning(
+                    f"Pausing event stream for {sleep_time:.1f}s ({type(e).__name__}: {e})"
+                )
+                await asyncio.sleep(sleep_time)
 
     async def game_stream(self, game_id: str) -> AsyncIterator[dict]:
         while True:
@@ -81,7 +87,11 @@ class Lichess:
                         yield event
                 return
             except Exception as e:
-                logger.warning(e)
+                sleep_time = random.random()
+                logger.warning(
+                    f"{game_id} -- Pausing game stream for {sleep_time:.1f}s ({type(e).__name__}: {e})"
+                )
+                await asyncio.sleep(sleep_time)
 
     async def get_online_bots(self) -> AsyncIterator[dict]:
         try:
@@ -91,7 +101,7 @@ class Lichess:
                     bot = json.loads(line)
                     yield bot
         except Exception as e:
-            logger.warning(e)
+            logger.warning(f"Stopping bot stream ({type(e).__name__}: {e})")
 
     async def accept_challenge(self, challenge_id: str) -> None:
         await self.post(f"/api/challenge/{challenge_id}/accept")
