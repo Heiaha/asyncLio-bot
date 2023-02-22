@@ -63,7 +63,12 @@ class Matchmaker:
             async for info in self.li.get_online_bots()
             if not info.get("disabled") and not info.get("tosViolation")
         ]
-        me = next(bot for bot in bots if bot.name == self.li.username)
+
+        me = next((bot for bot in bots if bot.name == self.li.username), None)
+
+        if me is None:
+            return
+
         random.shuffle(bots)
 
         variant = Variant(CONFIG["matchmaking"]["variant"])
