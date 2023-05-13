@@ -55,11 +55,11 @@ class Lichess:
                     time.sleep(60)
                 elif response.status_code >= 500:
                     logger.warning(
-                        f"Server error on {endpoint}: {response.status_code} ."
+                        f"Server error on {endpoint}: {response.status_code}."
                     )
                     await asyncio.sleep(1)
                 else:
-                    logger.error(f"Error on {endpoint}: {response.status_code} .")
+                    logger.error(f"Error on {endpoint}: {response.status_code}.")
                     return
         logger.warning(f"Giving up requests on {endpoint}.")
 
