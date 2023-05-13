@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import random
+import time
 from typing import AsyncIterator
 
 import backoff
@@ -25,32 +26,42 @@ class Lichess:
         self.username: str = user_info["username"]
         self.title: str = user_info.get("title", "")
         self.client: httpx.AsyncClient = httpx.AsyncClient(
-            base_url="https://lichess.org", headers=headers, timeout=10,
+            base_url="https://lichess.org",
+            headers=headers,
+            timeout=10,
         )
 
     @property
     def me(self):
         return f"{self.title} {self.username}"
 
-    @backoff.on_exception(
-        backoff.constant,
-        httpx.RequestError,  # non-HTTP status errors
-        max_time=60,
-        logger=logger,
-        backoff_log_level=logging.WARNING,
-        giveup_log_level=logging.ERROR,
-        raise_on_giveup=False,
-    )
-    @backoff.on_predicate(
-        backoff.expo,
-        lambda response: response.status_code >= 500,
-        max_time=300,
-        logger=logger,
-        backoff_log_level=logging.WARNING,
-        giveup_log_level=logging.ERROR,
-    )
-    async def post(self, endpoint: str, **kwargs) -> httpx.Response:
-        return await self.client.post(endpoint, **kwargs)
+    async def post(self, endpoint: str, **kwargs) -> None:
+        start_time = time.monotonic()
+
+        while time.monotonic() < start_time + 600:
+            try:
+                response = await self.client.post(endpoint, **kwargs)
+            except httpx.RequestError:
+                logger.warning(f"Connection error on {endpoint}.")
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"Error on {endpoint}: ({type(e).__name__}: {e}).")
+                return
+            else:
+                if response.status_code == 200:
+                    return
+                elif response.status_code == 429:
+                    logger.warning(f"Too many requests on {endpoint}.")
+                    time.sleep(60)
+                elif response.status_code >= 500:
+                    logger.warning(
+                        f"Server error on {endpoint}: {response.status_code} ."
+                    )
+                    await asyncio.sleep(1)
+                else:
+                    logger.error(f"Error on {endpoint}: {response.status_code} .")
+                    return
+        logger.warning(f"Giving up requests on {endpoint}.")
 
     async def event_stream(self) -> AsyncIterator[dict]:
         while True:
@@ -65,11 +76,8 @@ class Lichess:
                             event = {"type": "ping"}
                         yield event
             except Exception as e:
-                sleep_time = random.random()
-                logger.warning(
-                    f"Pausing event stream for {sleep_time:.1f}s ({type(e).__name__}: {e})"
-                )
-                await asyncio.sleep(sleep_time)
+                logger.warning(f"Error in event stream ({type(e).__name__}: {e}).")
+                await asyncio.sleep(1)
 
     async def game_stream(self, game_id: str) -> AsyncIterator[dict]:
         while True:
@@ -87,11 +95,10 @@ class Lichess:
                         yield event
                 return
             except Exception as e:
-                sleep_time = random.random()
                 logger.warning(
-                    f"{game_id} -- Pausing game stream for {sleep_time:.1f}s ({type(e).__name__}: {e})"
+                    f"{game_id} -- Error in game stream ({type(e).__name__}: {e})."
                 )
-                await asyncio.sleep(sleep_time)
+                await asyncio.sleep(1)
 
     async def get_online_bots(self) -> AsyncIterator[dict]:
         try:
@@ -101,7 +108,7 @@ class Lichess:
                     bot = json.loads(line)
                     yield bot
         except Exception as e:
-            logger.warning(f"Stopping bot stream ({type(e).__name__}: {e})")
+            logger.warning(f"Stopping bot stream ({type(e).__name__}: {e}).")
 
     async def accept_challenge(self, challenge_id: str) -> None:
         await self.post(f"/api/challenge/{challenge_id}/accept")
