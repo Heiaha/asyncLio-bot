@@ -80,7 +80,6 @@ class Matchmaker:
             perf_type = PerfType.from_nonstandard_variant(variant)
 
         for bot in bots:
-
             if me.should_challenge(bot, perf_type):
                 logger.info(
                     f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds/60}+{tc_increment}."

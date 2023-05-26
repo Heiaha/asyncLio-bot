@@ -151,7 +151,6 @@ class Game:
         )
 
     def format_result_message(self, event: dict) -> str:
-
         if wb_winner := event.get("winner"):
             white_name, black_name = self.player_names
             winning_name = white_name if wb_winner == "white" else black_name
@@ -218,7 +217,6 @@ class Game:
         return None
 
     async def get_engine_move(self) -> (chess.Move, chess.engine.InfoDict):
-
         clock = self.clock.copy()
 
         clock_name = "white_clock" if self.color == chess.WHITE else "black_clock"
