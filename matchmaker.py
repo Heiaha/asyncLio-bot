@@ -64,9 +64,9 @@ class Matchmaker:
             if not info.get("disabled") and not info.get("tosViolation")
         ]
 
-        me = next((bot for bot in bots if bot.name == self.li.username), None)
-
-        if me is None:
+        try:
+            me = next(bot for bot in bots if bot.name == self.li.username)
+        except StopIteration:
             return
 
         random.shuffle(bots)
