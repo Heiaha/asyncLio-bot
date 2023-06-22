@@ -1,11 +1,9 @@
 import asyncio
 import json
 import logging
-import random
 import time
 from typing import AsyncIterator
 
-import backoff
 import chess
 import httpx
 
@@ -52,7 +50,7 @@ class Lichess:
                     return
                 elif response.status_code == 429:
                     logger.warning(f"Too many requests on {endpoint}.")
-                    time.sleep(60)
+                    await asyncio.sleep(60)
                 elif response.status_code >= 500:
                     logger.warning(
                         f"Server error on {endpoint}: {response.status_code}."
