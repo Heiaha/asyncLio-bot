@@ -33,29 +33,23 @@ async def main(args: argparse.Namespace) -> NoReturn:
 
     print(LOGO)
 
-    li = Lichess()
+    async with Lichess() as li:
+        if args.upgrade:
+            if li.title == "BOT":
+                logger.warning(
+                    f"{li.username} is already a BOT account. Run asyncLio-bot without the upgrade flag in the future."
+                )
+            else:
+                await li.upgrade_account()
+                logger.info(f"Upgraded {li.username} to a BOT account.")
+                return
 
-    if args.upgrade:
-        if li.title == "BOT":
-            logger.warning(
-                f"{li.username} is already a BOT account. Run asyncLio-bot without the upgrade flag in the future."
-            )
-        else:
-            await li.upgrade_account()
-            logger.info(f"Upgraded {li.username} to a BOT account.")
+        if li.title != "BOT":
+            logger.critical("asyncLio-bot can only be used by BOT accounts.")
             return
 
-    if li.title != "BOT":
-        logger.critical("asyncLio-bot can only be used by BOT accounts.")
-        return
-
-    logger.info(f"Logged in as {li.me}.")
-
-    try:
+        logger.info(f"Logged in as {li.me}.")
         await GameManager(li).watch_event_stream()
-    finally:
-        logger.debug("Closing client.")
-        await li.client.aclose()
 
 
 if __name__ == "__main__":

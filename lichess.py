@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class Lichess:
-    def __init__(self) -> None:
+    async def __aenter__(self):
         headers = {
             "Authorization": f"Bearer {CONFIG['token']}",
         }
@@ -29,6 +29,11 @@ class Lichess:
             headers=headers,
             timeout=10,
         )
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.client.aclose()
+        logger.debug("Client closed.")
 
     @property
     def me(self):
@@ -42,6 +47,7 @@ class Lichess:
             try:
                 response = await self.client.post(endpoint, **kwargs)
                 response.raise_for_status()
+                return
             except httpx.RequestError:
                 logger.warning(f"Connection error on {endpoint}.")
                 await asyncio.sleep(sleep)
@@ -55,8 +61,6 @@ class Lichess:
                     return
             except Exception as e:
                 logger.error(f"Error on {endpoint}: ({type(e).__name__}: {e}).")
-                return
-            else:
                 return
 
             sleep = min(60.0, random.uniform(1, 3 * sleep))
