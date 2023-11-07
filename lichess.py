@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import time
+import random
 from typing import AsyncIterator
 
 import chess
@@ -35,78 +36,71 @@ class Lichess:
 
     async def post(self, endpoint: str, **kwargs) -> None:
         start_time = time.monotonic()
+        sleep = random.uniform(0, 2)
 
         while time.monotonic() < start_time + 600:
             try:
                 response = await self.client.post(endpoint, **kwargs)
+                response.raise_for_status()
             except httpx.RequestError:
                 logger.warning(f"Connection error on {endpoint}.")
-                await asyncio.sleep(1)
+                await asyncio.sleep(sleep)
+            except httpx.HTTPStatusError as e:
+                logger.warning(f"Error {e.response.status_code} on {endpoint}.")
+                if e.response.status_code == 429:
+                    await asyncio.sleep(60.0 + sleep)
+                elif e.response.status_code >= 500:
+                    await asyncio.sleep(sleep)
+                else:
+                    return
             except Exception as e:
                 logger.error(f"Error on {endpoint}: ({type(e).__name__}: {e}).")
                 return
             else:
-                if response.status_code == 200:
-                    return
-                elif response.status_code == 429:
-                    logger.warning(f"Too many requests on {endpoint}.")
-                    await asyncio.sleep(60)
-                elif response.status_code >= 500:
-                    logger.warning(
-                        f"Server error on {endpoint}: {response.status_code}."
-                    )
-                    await asyncio.sleep(1)
-                else:
-                    logger.error(f"Error on {endpoint}: {response.status_code}.")
-                    return
+                return
+
+            sleep = min(60.0, random.uniform(1, 3 * sleep))
         logger.warning(f"Giving up requests on {endpoint}.")
 
-    async def event_stream(self) -> AsyncIterator[dict]:
+    async def stream(self, endpoint: str):
         while True:
+            sleep = random.uniform(0, 2)
             try:
-                async with self.client.stream("GET", "/api/stream/event") as response:
+                async with self.client.stream("GET", endpoint) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():
                         if line.strip():
                             event = json.loads(line)
-                            logger.debug(f"Event: {event}")
+                            logger.debug(f"Event {endpoint}: {event}")
                         else:
                             event = {"type": "ping"}
                         yield event
-            except Exception as e:
-                logger.warning(f"Error in event stream ({type(e).__name__}: {e}).")
-                await asyncio.sleep(1)
-
-    async def game_stream(self, game_id: str) -> AsyncIterator[dict]:
-        while True:
-            try:
-                async with self.client.stream(
-                    "GET", f"/api/bot/game/stream/{game_id}"
-                ) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if line.strip():
-                            event = json.loads(line)
-                            logger.debug(f"Game event: {event}")
-                        else:
-                            event = {"type": "ping"}
-                        yield event
-                return
+                    return
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    await asyncio.sleep(60.0 + sleep)
+                elif e.response.status_code >= 500:
+                    await asyncio.sleep(sleep)
+                else:
+                    return
             except Exception as e:
                 logger.warning(
-                    f"{game_id} -- Error in game stream ({type(e).__name__}: {e})."
+                    f"Error in event stream {endpoint} ({type(e).__name__}: {e})."
                 )
-                await asyncio.sleep(1)
+                await asyncio.sleep(sleep)
+
+    async def event_stream(self) -> AsyncIterator[dict]:
+        while True:  # in case the event stream expires
+            async for event in self.stream("/api/stream/event"):
+                yield event
+
+    async def game_stream(self, game_id: str) -> AsyncIterator[dict]:
+        async for event in self.stream(f"/api/bot/game/stream/{game_id}"):
+            yield event
 
     async def get_online_bots(self) -> AsyncIterator[dict]:
-        try:
-            async with self.client.stream("GET", "/api/bot/online") as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    bot = json.loads(line)
-                    yield bot
-        except Exception as e:
-            logger.warning(f"Stopping bot stream ({type(e).__name__}: {e}).")
+        async for event in self.stream("/api/bot/online"):
+            yield event
 
     async def accept_challenge(self, challenge_id: str) -> None:
         await self.post(f"/api/challenge/{challenge_id}/accept")

@@ -54,6 +54,7 @@ async def main(args: argparse.Namespace) -> NoReturn:
     try:
         await GameManager(li).watch_event_stream()
     finally:
+        logger.debug("Closing client.")
         await li.client.aclose()
 
 
