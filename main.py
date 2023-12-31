@@ -5,6 +5,7 @@ from typing import NoReturn
 
 import chess.engine
 
+import config
 from game_manager import GameManager
 from lichess import Lichess
 
@@ -30,6 +31,8 @@ async def main(args: argparse.Namespace) -> NoReturn:
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=logging_handlers,
     )
+
+    config.load_config(args.config)
 
     print(LOGO)
 
@@ -58,6 +61,9 @@ if __name__ == "__main__":
         "--upgrade", "-u", action="store_true", help="Upgrade account to BOT account."
     )
     parser.add_argument("--log", "-l", type=str, help="Log file.")
+    parser.add_argument(
+        "--config", "-c", type=str, default="config.yml", help="Log file."
+    )
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Make output more verbose."
     )
