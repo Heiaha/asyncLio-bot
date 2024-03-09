@@ -1,33 +1,33 @@
 token: "XXXXXXXXXXXXXXX"
-concurrency: 1               # Number of games to play simultaneously.
-abort_time: 20               # Amount of time (in s) to abort game start after no activity.
-move_overhead : 2000         # Amount of time (in ms) to subtract from each move before being given to the engine.
+concurrency: 1                # Number of games to play simultaneously.
+abort_time: 20                # Amount of time (in s) to abort game start after no activity.
+move_overhead : 2000          # Amount of time (in ms) to subtract from each move before being given to the engine.
 engine:
   path: /path/to/engine
-  uci_options:               # Arbitrary UCI options passed to the engine. Can be commented out or changed.
-#    Threads: 1              # Max CPU threads the engine can use.
-#    Hash: 128               # Hash size (in MB).
+  uci_options:                # Arbitrary UCI options passed to the engine. Can be commented out or changed.
+#    Threads: 1               # Max CPU threads the engine can use.
+#    Hash: 128                # Hash size (in MB).
 
 books:
   enabled: false
-  selection: weighted_random # One from weighted_random, uniform_random, or best_move.
+  selection: weighted_random  # One from weighted_random, uniform_random, or best_move.
   depth: 10
-  standard:                  # List of book file paths for variant standard. Add additional books or variants.
+  standard:                   # List of book file paths for variant standard. Add additional books or variants.
     - path/to/book
     - path/to/second/book
-  chess960:                  # List of book file paths for variant chess960.
+  chess960:                   # List of book file paths for variant chess960.
     - path/to/960
     - path/to/second/960
-  atomic:                    # List of book file paths for variant atomic.
+  atomic:                     # List of book file paths for variant atomic.
     - path/to/atomic
 
-challenge:                   # Incoming challenges.
-  enabled: true              # Flag for controlling if any challenges get accepted. Overrides all other flags.
-  max_increment: 60          # Maximum amount of increment to accept a challenge. The max is 180. Set to 0 for no increment.
-  min_increment: 0           # Minimum amount of increment to accept a challenge.
-  max_initial: 3600          # Maximum amount of base time to accept a challenge. The max is 315360000 (10 years).
-  min_initial: 0             # Minimum amount of base time to accept a challenge.
-  variants:                  # Chess variants to accept (https://lichess.org/variant).
+challenge:                    # Incoming challenges.
+  enabled: true               # Flag for controlling if any challenges get accepted. Overrides all other flags.
+  max_increment: 60           # Maximum amount of increment to accept a challenge. The max is 180. Set to 0 for no increment.
+  min_increment: 0            # Minimum amount of increment to accept a challenge.
+  max_initial: 3600           # Maximum amount of base time to accept a challenge. The max is 315360000 (10 years).
+  min_initial: 0              # Minimum amount of base time to accept a challenge.
+  variants:                   # Chess variants to accept (https://lichess.org/variant).
     - standard
 #    - chess960
 #    - fromPosition
@@ -38,7 +38,7 @@ challenge:                   # Incoming challenges.
 #    - kingOfTheHill
 #    - racingKings
 #    - threeCheck
-  time_controls:             # Time controls to accept (does not currently support correspondence).
+  time_controls:              # Time controls to accept (does not currently support correspondence).
     - bullet
     - blitz
     - rapid
@@ -49,22 +49,25 @@ challenge:                   # Incoming challenges.
   opponents:
     - human
     - bot
+  max_rating_diffs:           # Maximum rating distance to opponent, useful for preventing elo manipulation.
+    human: 4000
+    bot: 4000
 
-draw:                        # Whether to offer/accept draws under certain conditions.
+draw:                         # Whether to offer/accept draws under certain conditions.
   enabled: false
-  score: 0                   # If engine score is less than or equal to this value, the bot offers/accepts draw (in cp).
-  moves: 5                   # How many moves in a row the absolute value of the score has to be below the draw value.
-  min_game_length: 35        # Only offer/accept a draw if the number of full moves on board is fewer than this value.
+  score: 0                    # If engine score is less than or equal to this value, the bot offers/accepts draw (in cp).
+  moves: 5                    # How many moves in a row the absolute value of the score has to be below the draw value.
+  min_game_length: 35         # Only offer/accept a draw if the number of full moves on board is fewer than this value.
 
 resign:
   enabled: false
-  score: -1000               # If engine score is less than or equal to this value, the bot resigns (in cp).
-  moves: 5                   # How many moves in a row the value of the score has to be below the resignation value.
+  score: -1000                # If engine score is less than or equal to this value, the bot resigns (in cp).
+  moves: 5                    # How many moves in a row the value of the score has to be below the resignation value.
 
 matchmaking:
   enabled: true
   variant: standard
-  initial_times:             # Initial time for matchmaking mode to be selected at random.
+  initial_times:              # Initial time for matchmaking mode to be selected at random.
     - 60
     - 120
 #    - 300
@@ -73,10 +76,10 @@ matchmaking:
 #    - 900
 #    - 1800
 #    - 2400
-  increments:                # Increment time for matchmaking mode to be selected at random.
+  increments:                 # Increment time for matchmaking mode to be selected at random.
     - 0
     - 1
-  max_rating_diff: 4000      # Maximum rating distance to opponent.
-  min_games: 250             # Minimum games opponent must have played.
-  timeout: 5                 # Timeout (in minutes) between nothing happening and issuing a challenge.
-  rated: false               # Whether to challenge rated or casual.
+  max_rating_diff: 4000       # Maximum rating distance to opponent.
+  min_games: 250              # Minimum games opponent must have played.
+  timeout: 5                  # Timeout (in minutes) between nothing happening and issuing a challenge.
+  rated: false                # Whether to challenge rated or casual.

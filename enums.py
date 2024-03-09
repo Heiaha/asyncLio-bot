@@ -126,6 +126,10 @@ class DeclineReason(Enum):
         max_increment = CONFIG["challenge"].get("max_increment", 180)
         min_initial = CONFIG["challenge"].get("min_initial", 0)
         max_initial = CONFIG["challenge"].get("max_initial", 315360000)
+        max_bot_rating_diff = CONFIG["challenge"]["max_rating_diffs"].get("bot", 4000)
+        max_human_rating_diff = CONFIG["challenge"]["max_rating_diffs"].get(
+            "human", 4000
+        )
 
         is_rated = event["challenge"]["rated"]
         if is_rated and "rated" not in allowed_modes:
@@ -140,8 +144,15 @@ class DeclineReason(Enum):
 
         if challenger_info := event["challenge"]["challenger"]:
             is_bot = challenger_info["title"] == "BOT"
+            their_rating = challenger_info.get("rating")
         else:
             is_bot = False
+            their_rating = None
+
+        if my_info := event["challenge"]["destUser"]:
+            my_rating = my_info.get("rating")
+        else:
+            my_rating = None
 
         if is_bot and "bot" not in allowed_opponents:
             return cls.NO_BOT
@@ -160,3 +171,11 @@ class DeclineReason(Enum):
 
         if initial > max_initial or increment > max_increment:
             return cls.TOO_SLOW
+
+        if is_rated and my_rating is not None and their_rating is not None:
+            rating_diff = abs(my_rating - their_rating)
+            if is_bot and rating_diff > max_bot_rating_diff:
+                return cls.GENERIC
+
+            if not is_bot and rating_diff > max_human_rating_diff:
+                return cls.GENERIC

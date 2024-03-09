@@ -25,7 +25,7 @@ class Game:
         self.opponent: str = event["game"]["opponent"]["username"]
         self.initial_fen: str = event["game"]["fen"]
         self.variant: Variant = Variant(event["game"]["variant"]["key"])
-        self.status: GameStatus = GameStatus.CREATED
+        self.status: GameStatus = GameStatus(event["game"]["status"]["name"])
         self.scores: list[chess.engine.PovScore] = []
         self.board: chess.Board = self.make_board()
 
@@ -93,8 +93,8 @@ class Game:
         elif self.variant == Variant.FROM_POSITION:
             board = chess.Board(self.initial_fen)
         else:
-            variant_board_type = chess.variant.find_variant(self.variant.value)
-            board = variant_board_type()
+            VariantBoard = chess.variant.find_variant(self.variant.value)
+            board = VariantBoard()
 
         if moves:
             for move in moves:
@@ -153,8 +153,11 @@ class Game:
     def format_result_message(self, event: dict) -> str:
         if wb_winner := event.get("winner"):
             white_name, black_name = self.player_names
-            winning_name = white_name if wb_winner == "white" else black_name
-            losing_name = white_name if wb_winner == "black" else black_name
+            winning_name, losing_name = (
+                (white_name, black_name)
+                if wb_winner == "white"
+                else (black_name, white_name)
+            )
 
             message = f"{winning_name} won"
 
