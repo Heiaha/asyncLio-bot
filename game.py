@@ -137,7 +137,7 @@ class Game:
         )
 
     def format_engine_move_message(
-        self, move: chess.Move, info: chess.engine.InfoDict
+        self, move: chess.Move, info: chess.engine.InfoDict, search_time: float
     ) -> str:
         return "{id} -- Engine: {move_number}{ellipses} {move:<10}Score: {score!s:<10}Time: {time:<10.1f}Depth: {depth:<10}PV: {pv!s:<30}".format(
             id=self.id,
@@ -145,7 +145,7 @@ class Game:
             ellipses="." if self.board.turn == chess.WHITE else "...",
             move=self.board.san(move),
             score=score.pov(self.color) if (score := info.get("score")) else None,
-            time=info.get("time", 0.0),
+            time=search_time,
             depth=info.get("depth", 1),
             pv=self.board.variation_san(pv) if (pv := info.get("pv")) else None,
         )
@@ -254,8 +254,14 @@ class Game:
             logger.info(self.format_book_move_message(move))
         else:
             try:
+                search_start_time = time.monotonic()
                 move, info = await self.get_engine_move()
-                logger.info(self.format_engine_move_message(move, info))
+                search_end_time = time.monotonic()
+                logger.info(
+                    self.format_engine_move_message(
+                        move, info, search_end_time - search_start_time
+                    )
+                )
             except RuntimeError as e:
                 # We may get a chess.engine.EngineTerminatedError if the game ends (and engine is quit) while searching.
                 # If that's the case, don't log it as an error.
