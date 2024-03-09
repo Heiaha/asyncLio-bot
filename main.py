@@ -4,6 +4,7 @@ import logging
 from typing import NoReturn
 
 import chess.engine
+import httpx
 
 import config
 from game_manager import GameManager
@@ -30,6 +31,10 @@ async def main(args: argparse.Namespace) -> NoReturn:
         format="%(asctime)s %(levelname)-8s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=logging_handlers,
+    )
+
+    logging.getLogger(httpx.__name__).setLevel(
+        logging.DEBUG if args.verbose else logging.WARNING
     )
 
     config.load_config(args.config)
