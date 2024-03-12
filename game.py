@@ -299,7 +299,7 @@ class Game:
                     logger.info(self.format_result_message(event["state"]))
                     break
 
-                # Only make a move here if it's our turn, and we haven't made a move since entering the loop.
+                # Only make a move here if it's our turn, and we aren't currently making a move.
                 if self.is_our_turn and all(task.done() for task in move_tasks):
                     move_tasks.append(asyncio.create_task(self.make_move()))
 
