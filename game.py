@@ -300,7 +300,7 @@ class Game:
                     break
 
                 # Only make a move here if it's our turn, and we haven't made a move since entering the loop.
-                if self.is_our_turn and len(move_tasks) == 0:
+                if self.is_our_turn and all(task.done() for task in move_tasks):
                     move_tasks.append(asyncio.create_task(self.make_move()))
 
             elif event_type == GameEvent.GAME_STATE:
@@ -310,7 +310,11 @@ class Game:
                     logger.info(self.format_result_message(event))
                     break
 
-                if self.is_our_turn and board_updated:
+                if (
+                    self.is_our_turn
+                    and board_updated
+                    and all(task.done() for task in move_tasks)
+                ):
                     move_tasks.append(asyncio.create_task(self.make_move()))
 
             elif event_type == GameEvent.PING:
