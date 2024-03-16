@@ -49,6 +49,9 @@ class GameManager:
         self.last_event_time = time.monotonic()
         game_id = event["game"]["id"]
 
+        if game_id in self.current_games:
+            return
+
         # If this is an extremely late acceptance of a challenge we issued earlier
         # that would bring us over our concurrency limit, abort it.
         if not self.is_under_concurrency_limit():
@@ -87,6 +90,9 @@ class GameManager:
     async def on_challenge(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
         challenge_id = event["challenge"]["id"]
+
+        if challenge_id in self.challenge_queue:
+            return
 
         if challenger_info := event["challenge"]["challenger"]:
             challenger_name = challenger_info["name"]
