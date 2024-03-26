@@ -115,41 +115,41 @@ class DeclineReason(Enum):
 
     @classmethod
     def from_event(cls, event: dict) -> "DeclineReason":
-        if not CONFIG["challenge"]["enabled"]:
+        challenge_config = CONFIG["challenge"]
+        if not challenge_config["enabled"]:
             return cls.GENERIC
 
-        allowed_modes = CONFIG["challenge"]["modes"]
-        allowed_opponents = CONFIG["challenge"]["opponents"]
-        allowed_variants = CONFIG["challenge"]["variants"]
-        allowed_tcs = CONFIG["challenge"]["time_controls"]
-        min_increment = CONFIG["challenge"].get("min_increment", 0)
-        max_increment = CONFIG["challenge"].get("max_increment", 180)
-        min_initial = CONFIG["challenge"].get("min_initial", 0)
-        max_initial = CONFIG["challenge"].get("max_initial", 315360000)
-        max_bot_rating_diff = CONFIG["challenge"]["max_rating_diffs"].get("bot", 4000)
-        max_human_rating_diff = CONFIG["challenge"]["max_rating_diffs"].get(
-            "human", 4000
-        )
+        allowed_modes = challenge_config["modes"]
+        allowed_opponents = challenge_config["opponents"]
+        allowed_variants = challenge_config["variants"]
+        allowed_tcs = challenge_config["time_controls"]
+        min_increment = challenge_config.get("min_increment", 0)
+        max_increment = challenge_config.get("max_increment", 180)
+        min_initial = challenge_config.get("min_initial", 0)
+        max_initial = challenge_config.get("max_initial", 315360000)
+        max_bot_rating_diff = challenge_config["max_rating_diffs"].get("bot", 4000)
+        max_human_rating_diff = challenge_config["max_rating_diffs"].get("human", 4000)
 
-        is_rated = event["challenge"]["rated"]
+        challenge_info = event["challenge"]
+        is_rated = challenge_info["rated"]
         if is_rated and "rated" not in allowed_modes:
             return cls.CASUAL
 
         if not is_rated and "casual" not in allowed_modes:
             return cls.RATED
 
-        variant = event["challenge"]["variant"]["key"]
+        variant = challenge_info["variant"]["key"]
         if variant not in allowed_variants:
             return cls.VARIANT
 
-        if challenger_info := event["challenge"]["challenger"]:
+        if challenger_info := challenge_info["challenger"]:
             is_bot = challenger_info["title"] == "BOT"
             their_rating = challenger_info.get("rating")
         else:
             is_bot = False
             their_rating = None
 
-        if my_info := event["challenge"]["destUser"]:
+        if my_info := challenge_info["destUser"]:
             my_rating = my_info.get("rating")
         else:
             my_rating = None
@@ -160,9 +160,9 @@ class DeclineReason(Enum):
         if not is_bot and "human" not in allowed_opponents:
             return cls.ONLY_BOT
 
-        increment = event["challenge"]["timeControl"].get("increment", 0)
-        initial = event["challenge"]["timeControl"].get("limit", 0)
-        speed = event["challenge"]["speed"]
+        increment = challenge_info["timeControl"].get("increment", 0)
+        initial = challenge_info["timeControl"].get("limit", 0)
+        speed = challenge_info["speed"]
         if speed not in allowed_tcs:
             return cls.TIME_CONTROL
 

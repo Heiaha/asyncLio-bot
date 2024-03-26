@@ -43,27 +43,26 @@ class Lichess:
         start_time = time.monotonic()
         sleep = random.uniform(0, 2)
 
-        while time.monotonic() < start_time + 600:
+        while time.monotonic() - start_time < 600:
             try:
                 response = await self.client.post(endpoint, **kwargs)
                 response.raise_for_status()
-                return
+                return  # Success, exit the function
             except httpx.RequestError:
                 logger.warning(f"Connection error on {endpoint}.")
-                await asyncio.sleep(sleep)
             except httpx.HTTPStatusError as e:
                 logger.warning(f"Error {e.response.status_code} on {endpoint}.")
                 if e.response.status_code == 429:
-                    await asyncio.sleep(60.0 + sleep)
-                elif e.response.status_code >= 500:
-                    await asyncio.sleep(sleep)
-                else:
-                    return
+                    sleep += 60.0
+                elif e.response.status_code < 500:
+                    return  # Exit on client errors (4xx, except 429)
+                #  Otherwise sleep at end of loop
             except Exception as e:
                 logger.error(f"Error on {endpoint}: ({type(e).__name__}: {e}).")
-                return
+                return  # Unrecoverable error, exit the function
 
-            sleep = min(60.0, random.uniform(1, 3 * sleep))
+            await asyncio.sleep(sleep)
+            sleep = min(60.0, random.uniform(1, 2 * sleep))
         logger.warning(f"Giving up requests on {endpoint}.")
 
     async def stream(self, endpoint: str):
@@ -82,16 +81,16 @@ class Lichess:
                     return
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 429:
-                    await asyncio.sleep(60.0 + sleep)
-                elif e.response.status_code >= 500:
-                    await asyncio.sleep(sleep)
-                else:
-                    return
+                    sleep += 60
+                elif e.response.status_code < 500:
+                    return  # Exit on client errors (4xx, except 429)
+                #  Otherwise sleep at end of loop
             except Exception as e:
                 logger.warning(
                     f"Error in event stream {endpoint} ({type(e).__name__}: {e})."
                 )
-                await asyncio.sleep(sleep)
+
+            await asyncio.sleep(sleep)
 
     async def event_stream(self) -> AsyncIterator[dict]:
         while True:  # in case the event stream expires

@@ -136,7 +136,7 @@ class GameManager:
         if not CONFIG["matchmaking"]["enabled"]:
             return False
 
-        if len(self.current_games) != 0:
+        if len(self.current_games) > 0:
             return False
 
         return (

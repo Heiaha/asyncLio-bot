@@ -243,7 +243,7 @@ class Game:
         self.scores.append(
             score
             if (score := result.info.get("score"))
-            else chess.engine.PovScore(chess.engine.Mate(1), self.board.turn)
+            else chess.engine.PovScore(chess.engine.MateGiven, self.board.turn)
         )
 
         return result.move, result.info
@@ -291,39 +291,29 @@ class Game:
         await self.start_engine()
         async for event in self.li.game_stream(self.id):
             event_type = GameEvent(event["type"])
+            should_make_move = False
 
             if event_type == GameEvent.GAME_FULL:
                 self.update(event["state"])
-
-                if self.is_game_over:
-                    logger.info(self.format_result_message(event["state"]))
-                    break
-
-                # Only make a move here if it's our turn, and we aren't currently making a move.
-                if self.is_our_turn and all(task.done() for task in move_tasks):
-                    move_tasks.append(asyncio.create_task(self.make_move()))
+                should_make_move = self.is_our_turn
 
             elif event_type == GameEvent.GAME_STATE:
-                board_updated = self.update(event)
+                should_make_move = self.update(event) and self.is_our_turn
 
-                if self.is_game_over:
-                    logger.info(self.format_result_message(event))
-                    break
+            elif (
+                event_type == GameEvent.PING
+                and len(self.board.move_stack) < 2
+                and not self.is_our_turn
+                and time.monotonic() - start_time >= CONFIG["abort_time"]
+            ):
+                await self.li.abort_game(self.id)
 
-                if (
-                    self.is_our_turn
-                    and board_updated
-                    and all(task.done() for task in move_tasks)
-                ):
-                    move_tasks.append(asyncio.create_task(self.make_move()))
+            if self.is_game_over:
+                logger.info(self.format_result_message(event.get("state", event)))
+                break
 
-            elif event_type == GameEvent.PING:
-                if (
-                    len(self.board.move_stack) < 2
-                    and not self.is_our_turn
-                    and time.monotonic() - start_time >= CONFIG["abort_time"]
-                ):
-                    await self.li.abort_game(self.id)
+            if should_make_move and all(task.done() for task in move_tasks):
+                move_tasks.append(asyncio.create_task(self.make_move()))
 
         # Just in case we've reached this stage unexpectedly.
         if not self.is_game_over:
