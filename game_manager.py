@@ -103,7 +103,7 @@ class GameManager:
             return
 
         logger.info(f"{challenge_id} -- Challenger: {challenger_name}.")
-        if decline_reason := DeclineReason.from_event(event):
+        if decline_reason := self.check_decline_reason(event):
             logger.info(
                 f"{challenge_id} -- Declining challenge from {challenger_name} for reason: {decline_reason}."
             )
@@ -152,3 +152,72 @@ class GameManager:
             for game_id, game in self.current_games.items()
             if not game.is_game_over
         }
+
+    @staticmethod
+    def check_decline_reason(event: dict) -> DeclineReason | None:
+        challenge_config = CONFIG["challenge"]
+        if not challenge_config["enabled"]:
+            return DeclineReason.GENERIC
+
+        allowed_modes = challenge_config["modes"]
+        allowed_opponents = challenge_config["opponents"]
+        allowed_variants = challenge_config["variants"]
+        allowed_tcs = challenge_config["time_controls"]
+        min_increment = challenge_config.get("min_increment", 0)
+        max_increment = challenge_config.get("max_increment", 180)
+        min_initial = challenge_config.get("min_initial", 0)
+        max_initial = challenge_config.get("max_initial", 315360000)
+        max_bot_rating_diff = challenge_config["max_rating_diffs"].get("bot", 4000)
+        max_human_rating_diff = challenge_config["max_rating_diffs"].get("human", 4000)
+
+        challenge_info = event["challenge"]
+        is_rated = challenge_info["rated"]
+        if is_rated and "rated" not in allowed_modes:
+            return DeclineReason.CASUAL
+
+        if not is_rated and "casual" not in allowed_modes:
+            return DeclineReason.RATED
+
+        variant = challenge_info["variant"]["key"]
+        if variant not in allowed_variants:
+            return DeclineReason.VARIANT
+
+        if challenger_info := challenge_info["challenger"]:
+            is_bot = challenger_info["title"] == "BOT"
+            their_rating = challenger_info.get("rating")
+        else:
+            is_bot = False
+            their_rating = None
+
+        if my_info := challenge_info["destUser"]:
+            my_rating = my_info.get("rating")
+        else:
+            my_rating = None
+
+        if is_bot and "bot" not in allowed_opponents:
+            return DeclineReason.NO_BOT
+
+        if not is_bot and "human" not in allowed_opponents:
+            return DeclineReason.ONLY_BOT
+
+        increment = challenge_info["timeControl"].get("increment", 0)
+        initial = challenge_info["timeControl"].get("limit", 0)
+        speed = challenge_info["speed"]
+        if speed not in allowed_tcs:
+            return DeclineReason.TIME_CONTROL
+
+        if initial < min_initial or increment < min_increment:
+            return DeclineReason.TOO_FAST
+
+        if initial > max_initial or increment > max_increment:
+            return DeclineReason.TOO_SLOW
+
+        if is_rated and my_rating is not None and their_rating is not None:
+            rating_diff = abs(my_rating - their_rating)
+            if is_bot and rating_diff > max_bot_rating_diff:
+                return DeclineReason.GENERIC
+
+            if not is_bot and rating_diff > max_human_rating_diff:
+                return DeclineReason.GENERIC
+
+        return None
