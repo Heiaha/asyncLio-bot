@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from collections import deque
@@ -44,6 +45,8 @@ class GameManager:
         if self.should_create_challenge():
             self.last_event_time = time.monotonic()
             await self.matchmaker.challenge()
+
+        logger.debug(f"Active tasks: {len(asyncio.all_tasks())}")
 
     async def on_game_start(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
