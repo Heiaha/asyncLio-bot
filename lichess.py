@@ -52,10 +52,12 @@ class Lichess:
                 logger.warning(f"Connection error on {endpoint}.")
             except httpx.HTTPStatusError as e:
                 status_code = e.response.status_code
-                logger.warning(f"Error {status_code} on {endpoint}.")
-                if status_code == 429:
+                logger.warning(
+                    f"Error {status_code} ({httpx.codes.get_reason_phrase(status_code)}) on {endpoint}."
+                )
+                if status_code == httpx.codes.TOO_MANY_REQUESTS:
                     delay += 60
-                elif status_code < 500:
+                elif httpx.codes.is_client_error(status_code):
                     return  # Exit on client errors (4xx, except 429)
                 #  Otherwise sleep at end of loop
             except Exception as e:
@@ -82,9 +84,12 @@ class Lichess:
                     return
             except httpx.HTTPStatusError as e:
                 status_code = e.response.status_code
-                if status_code == 429:
+                logger.warning(
+                    f"Error {status_code} ({httpx.codes.get_reason_phrase(status_code)}) on {endpoint}."
+                )
+                if status_code == httpx.codes.TOO_MANY_REQUESTS:
                     delay += 60
-                elif status_code < 500:
+                elif httpx.codes.is_client_error(status_code):
                     return  # Exit on client errors (4xx, except 429)
                 #  Otherwise sleep at end of loop
             except Exception as e:
