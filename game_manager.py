@@ -41,7 +41,14 @@ class GameManager:
                 self.on_challenge_canceled(event)
 
     async def on_ping(self) -> None:
-        self.clean_games()
+        # Sometimes the lichess game loop seems to close without the event loop sending a "gameFinish" event
+        # but still having closed the game stream. This will take case of those cases.
+        self.current_games = {
+            game_id: game
+            for game_id, game in self.current_games.items()
+            if not game.is_game_over
+        }
+
         if self.should_create_challenge():
             self.last_event_time = time.monotonic()
             await self.matchmaker.challenge()
@@ -74,14 +81,8 @@ class GameManager:
         self.last_event_time = time.monotonic()
         if (game_id := event["game"]["id"]) in self.current_games:
             game = self.current_games.pop(game_id)
-
-            # await task here to return and output any potential errors, but don't let it close the event loop
-            try:
-                await game.loop_task
-            except Exception as e:
-                logger.error(e)
-
             logger.info(f"{game} finished.")
+            await game.loop_task
 
         logger.info(
             f"Games: {len(self.current_games)}. Challenges: {len(self.challenge_queue)}."
@@ -97,10 +98,8 @@ class GameManager:
         if challenge_id in self.challenge_queue:
             return
 
-        if challenger_info := event["challenge"]["challenger"]:
-            challenger_name = challenger_info["name"]
-        else:
-            challenger_name = "Anonymous"
+        challenger_info = event["challenge"].get("challenger", {})
+        challenger_name = challenger_info.get("name", "Anonymous")
 
         if challenger_name == self.li.username:
             return
@@ -146,15 +145,6 @@ class GameManager:
             time.monotonic() - self.last_event_time
             >= max(1, CONFIG["matchmaking"]["timeout"]) * 60
         )
-
-    def clean_games(self) -> None:
-        # Sometimes the lichess game loop seems to close without the event loop sending a "gameFinish" event
-        # but still having closed the game stream. This function will take case of those cases.
-        self.current_games = {
-            game_id: game
-            for game_id, game in self.current_games.items()
-            if not game.is_game_over
-        }
 
     @staticmethod
     def check_decline_reason(event: dict) -> DeclineReason | None:

@@ -16,12 +16,9 @@ class Bot:
         self._ratings = {}
         self._num_games = {}
         for perf_type in PerfType:
-            if perf_info := info["perfs"].get(perf_type.value):
-                self._ratings[perf_type] = perf_info["rating"]
-                self._num_games[perf_type] = perf_info["games"]
-            else:
-                self._ratings[perf_type] = 1500
-                self._num_games[perf_type] = 0
+            perf_info = info.get("perfs", {}).get(perf_type.value, {})
+            self._ratings[perf_type] = perf_info.get("rating", 1500)
+            self._num_games[perf_type] = perf_info.get("games", 0)
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, Bot):
@@ -67,6 +64,7 @@ class Matchmaker:
         try:
             me = next(bot for bot in bots if bot.name == self.li.username)
         except StopIteration:
+            logger.warning("Current bot is not online in matchmaker.")
             return
 
         random.shuffle(bots)
@@ -74,10 +72,11 @@ class Matchmaker:
         variant = Variant(CONFIG["matchmaking"]["variant"])
         tc_seconds = random.choice(CONFIG["matchmaking"]["initial_times"])
         tc_increment = random.choice(CONFIG["matchmaking"]["increments"])
-        if variant == Variant.STANDARD:
-            perf_type = PerfType.from_standard_tc(tc_seconds, tc_increment)
-        else:
-            perf_type = PerfType.from_nonstandard_variant(variant)
+        perf_type = (
+            PerfType.from_standard_tc(tc_seconds, tc_increment)
+            if variant == Variant.STANDARD
+            else PerfType.from_nonstandard_variant(variant)
+        )
 
         for bot in bots:
             if me.should_challenge(bot, perf_type):

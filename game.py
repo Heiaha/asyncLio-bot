@@ -12,6 +12,7 @@ from config import CONFIG
 from enums import GameStatus, GameEvent, Variant, BookSelection
 from lichess import Lichess
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,13 +62,9 @@ class Game:
 
     async def start_engine(self) -> None:
         logger.debug(f"{self.id} -- Starting engine {CONFIG['engine']['path']}.")
-        try:
-            transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
-            if options := CONFIG["engine"].get("uci_options"):
-                await engine.configure(options)
-        except Exception as e:
-            logger.critical(f"{self.id} -- {e}")
-            sys.exit()
+        transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
+        if options := CONFIG["engine"].get("uci_options"):
+            await engine.configure(options)
         self.engine = engine
 
     def update(self, event: dict) -> bool:
@@ -241,33 +238,38 @@ class Game:
             raise RuntimeError(f"{self.id} -- Engine could not make a move.")
 
         self.scores.append(
-            score
-            if (score := result.info.get("score"))
-            else chess.engine.PovScore(chess.engine.MateGiven, self.board.turn)
+            result.info.get(
+                "score", chess.engine.PovScore(chess.engine.MateGiven, self.board.turn)
+            )
         )
 
         return result.move, result.info
 
     async def make_move(self) -> None:
         logger.info(f"{self.id} -- Searching for move from {self.board.fen()}.")
+
         if self.should_use_book() and (move := self.get_book_move()):
             logger.info(self.format_book_move_message(move))
-        else:
-            try:
-                search_start_time = time.monotonic()
-                move, info = await self.get_engine_move()
-                search_end_time = time.monotonic()
-                logger.info(
-                    self.format_engine_move_message(
-                        move, info, search_end_time - search_start_time
-                    )
+            await self.li.make_move(self.id, move)
+            return
+
+        try:
+            search_start_time = time.monotonic()
+            move, info = await self.get_engine_move()
+            search_end_time = time.monotonic()
+
+            logger.info(
+                self.format_engine_move_message(
+                    move, info, search_end_time - search_start_time
                 )
-            except RuntimeError as e:
-                # We may get a chess.engine.EngineTerminatedError if the game ends (and engine is quit) while searching.
-                # If that's the case, don't log it as an error.
-                if not self.is_game_over:
-                    logger.error(f"{self.id} -- {e}")
-                return
+            )
+        except chess.engine.EngineTerminatedError:
+            # We may get a chess.engine.EngineTerminatedError if the game ends (and engine is quit) while searching.
+            # If that's the case, don't log it as an error.
+            if not self.is_game_over:
+                await self.li.resign_game(self.id)
+                raise
+            return
 
         if self.is_game_over:
             return
@@ -277,7 +279,8 @@ class Game:
             await self.li.resign_game(self.id)
             return
 
-        if offer_draw := self.should_draw():
+        offer_draw = self.should_draw()
+        if offer_draw:
             logger.info(f"{self.id} -- Offering draw.")
 
         await self.li.make_move(self.id, move, offer_draw=offer_draw)

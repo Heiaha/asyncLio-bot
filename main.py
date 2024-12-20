@@ -3,14 +3,13 @@ import asyncio
 import logging
 from typing import NoReturn
 
-import chess.engine
 import httpx
 
 import config
 from game_manager import GameManager
 from lichess import Lichess
 
-LOGO = """
+LOGO = r"""
                               __ _             _           _   
   __ _ ___ _   _ _ __   ___  / /(_) ___       | |__   ___ | |_ 
  / _` / __| | | | '_ \ / __|/ / | |/ _ \ _____| '_ \ / _ \| __|

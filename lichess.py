@@ -1,8 +1,8 @@
 import asyncio
 import json
 import logging
-import time
 import random
+import time
 from typing import AsyncIterator
 
 import chess
@@ -27,7 +27,7 @@ class Lichess:
         self.client: httpx.AsyncClient = httpx.AsyncClient(
             base_url="https://lichess.org",
             headers=headers,
-            timeout=10,
+            timeout=60,
         )
         return self
 
@@ -60,8 +60,8 @@ class Lichess:
                 elif httpx.codes.is_client_error(status_code):
                     return  # Exit on client errors (4xx, except 429)
                 #  Otherwise sleep at end of loop
-            except Exception as e:
-                logger.error(f"Error on {endpoint}: ({type(e).__name__}: {e}).")
+            except Exception:
+                logger.exception(f"Error on {endpoint}.")
                 return  # Unrecoverable error, exit the function
 
             await asyncio.sleep(delay)
@@ -92,10 +92,8 @@ class Lichess:
                 elif httpx.codes.is_client_error(status_code):
                     return  # Exit on client errors (4xx, except 429)
                 #  Otherwise sleep at end of loop
-            except Exception as e:
-                logger.warning(
-                    f"Error in event stream {endpoint} ({type(e).__name__}: {e})."
-                )
+            except Exception:
+                logger.exception(f"Error in event stream {endpoint}.")
 
             await asyncio.sleep(delay)
 
