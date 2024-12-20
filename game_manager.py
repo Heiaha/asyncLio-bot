@@ -5,7 +5,7 @@ from collections import deque
 from typing import NoReturn
 
 from config import CONFIG
-from enums import Event, DeclineReason
+from enums import Event, DeclineReason, Variant
 from game import Game
 from lichess import Lichess
 from matchmaker import Matchmaker
@@ -183,19 +183,18 @@ class GameManager:
 
         variant = challenge_info["variant"]["key"]
         if variant not in allowed_variants:
-            return DeclineReason.VARIANT
+            return (
+                DeclineReason.STANDARD
+                if allowed_variants == [Variant.STANDARD.value]
+                else DeclineReason.VARIANT
+            )
 
-        if challenger_info := challenge_info["challenger"]:
-            is_bot = challenger_info["title"] == "BOT"
-            their_rating = challenger_info.get("rating")
-        else:
-            is_bot = False
-            their_rating = None
+        challenger_info = challenge_info.get("challenger", {})
+        is_bot = challenger_info.get("title") == "BOT"
+        their_rating = challenger_info.get("rating")
 
-        if my_info := challenge_info["destUser"]:
-            my_rating = my_info.get("rating")
-        else:
-            my_rating = None
+        my_info = challenge_info.get("destUser", {})
+        my_rating = my_info.get("rating")
 
         if is_bot and "bot" not in allowed_opponents:
             return DeclineReason.NO_BOT

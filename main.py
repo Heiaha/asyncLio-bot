@@ -67,11 +67,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("--log", "-l", type=str, help="Log file.")
     parser.add_argument(
-        "--config", "-c", type=str, default="config.yml", help="Log file."
+        "--config", "-c", type=str, default="config.yml", help="Config file."
     )
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Make output more verbose."
     )
 
-    asyncio.set_event_loop_policy(chess.engine.EventLoopPolicy())
     asyncio.run(main(parser.parse_args()))
