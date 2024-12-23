@@ -98,8 +98,10 @@ class GameManager:
         if challenge_id in self.challenge_queue:
             return
 
-        challenger_info = event["challenge"].get("challenger", {})
-        challenger_name = challenger_info.get("name", "Anonymous")
+        if challenger_info := event["challenge"]["challenger"]:
+            challenger_name = challenger_info["name"]
+        else:
+            challenger_name = "Anonymous"
 
         if challenger_name == self.li.username:
             return
@@ -179,12 +181,17 @@ class GameManager:
                 else DeclineReason.VARIANT
             )
 
-        challenger_info = challenge_info.get("challenger", {})
-        is_bot = challenger_info.get("title") == "BOT"
-        their_rating = challenger_info.get("rating")
+        if challenger_info := challenge_info["challenger"]:
+            is_bot = challenger_info["title"] == "BOT"
+            their_rating = challenger_info.get("rating")
+        else:
+            is_bot = False
+            their_rating = None
 
-        my_info = challenge_info.get("destUser", {})
-        my_rating = my_info.get("rating")
+        if my_info := challenge_info["destUser"]:
+            my_rating = my_info.get("rating")
+        else:
+            my_rating = None
 
         if is_bot and "bot" not in allowed_opponents:
             return DeclineReason.NO_BOT
