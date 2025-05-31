@@ -27,6 +27,7 @@ class Game:
         self.status: GameStatus = GameStatus(event["game"]["status"]["name"])
         self.scores: list[chess.engine.PovScore] = []
         self.board: chess.Board = self.make_board()
+        self.ponder_move: chess.Move | None = None
 
         # attributes to be set up asynchronously or after the game starts
         self.clock: dict[str, float] = {
@@ -235,6 +236,8 @@ class Game:
             ponder=CONFIG["engine"].get("ponder", False),
         )
 
+        self.ponder_move = result.ponder
+
         if not result.move:
             raise RuntimeError(f"{self.id} -- Engine could not make a move.")
 
@@ -247,7 +250,15 @@ class Game:
         return result.move, result.info
 
     async def make_move(self) -> None:
-        logger.info(f"{self.id} -- Searching for move from {self.board.fen()}.")
+
+        ponder_result_str = (
+            f"Ponder Hit." if self.ponder_move == self.board.peek()
+            else f"Ponder Miss." if self.ponder_move is not None
+            else ""
+        )
+
+        logger.info(f"{self.id} -- Searching for move from {self.board.fen()}. {ponder_result_str}")
+        self.ponder_move = None
 
         if self.should_use_book() and (move := self.get_book_move()):
             logger.info(self.format_book_move_message(move))
