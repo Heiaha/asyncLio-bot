@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import sys
 import time
 
 import chess
@@ -11,7 +10,6 @@ import chess.variant
 from config import CONFIG
 from enums import GameStatus, GameEvent, Variant, BookSelection
 from lichess import Lichess
-
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +229,10 @@ class Game:
         )
 
         result = await self.engine.play(
-            self.board, limit=limit, info=chess.engine.INFO_ALL
+            self.board,
+            limit=limit,
+            info=chess.engine.INFO_ALL,
+            ponder=CONFIG["engine"].get("ponder", False),
         )
 
         if not result.move:

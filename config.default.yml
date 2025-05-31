@@ -4,6 +4,7 @@ abort_time: 20                # Amount of time (in s) to abort game start after 
 move_overhead : 2000          # Amount of time (in ms) to subtract from each move before being given to the engine.
 engine:
   path: /path/to/engine
+  ponder: false
   uci_options:                # Arbitrary UCI options passed to the engine. Can be commented out or changed.
 #    Threads: 1               # Max CPU threads the engine can use.
 #    Hash: 128                # Hash size (in MB).
