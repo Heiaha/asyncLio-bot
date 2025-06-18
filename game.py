@@ -327,12 +327,15 @@ class Game:
                 logger.info(self.format_result_message(event.get("state", event)))
                 break
 
-            if should_make_move and all(task.done() for task in move_tasks):
+            if should_make_move:
                 move_tasks.append(asyncio.create_task(self.make_move()))
 
         # Just in case we've reached this stage unexpectedly.
         if not self.is_game_over:
             self.status = GameStatus.UNKNOWN_FINISH
 
-        logger.debug(f"{self.id} -- Quitting engine.")
-        await self.engine.quit()
+        try:
+            await asyncio.gather(*move_tasks)
+        finally:
+            logger.debug(f"{self.id} -- Quitting engine.")
+            await self.engine.quit()
