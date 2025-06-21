@@ -334,8 +334,5 @@ class Game:
         if not self.is_game_over:
             self.status = GameStatus.UNKNOWN_FINISH
 
-        try:
-            await asyncio.gather(*move_tasks)
-        finally:
-            logger.debug(f"{self.id} -- Quitting engine.")
-            await self.engine.quit()
+        await self.engine.quit()
+        await asyncio.gather(*move_tasks)
