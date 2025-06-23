@@ -328,6 +328,7 @@ class Game:
                 break
 
             if should_make_move:
+                await asyncio.gather(*move_tasks)
                 move_tasks.append(asyncio.create_task(self.make_move()))
 
         # Just in case we've reached this stage unexpectedly.
