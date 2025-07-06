@@ -129,7 +129,7 @@ class Game:
             id=self.id,
             move_number=self.board.fullmove_number,
             ellipses="." if self.board.turn == chess.WHITE else "...",
-            move=self.board.san(move),
+            move=move.uci(),
         )
 
     def format_engine_move_message(
