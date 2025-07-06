@@ -139,11 +139,11 @@ class Game:
             id=self.id,
             move_number=self.board.fullmove_number,
             ellipses="." if self.board.turn == chess.WHITE else "...",
-            move=self.board.san(move),
+            move=move.uci(),
             score=score.pov(self.color) if (score := info.get("score")) else None,
             time=search_time,
             depth=info.get("depth", 1),
-            pv=self.board.variation_san(pv) if (pv := info.get("pv")) else None,
+            pv=" ".join(m.uci() for m in pv) if (pv := info.get("pv")) else None,
         )
 
     def format_result_message(self, event: dict) -> str:
@@ -328,6 +328,7 @@ class Game:
                 break
 
             if should_make_move:
+                await asyncio.gather(*move_tasks)
                 move_tasks.append(asyncio.create_task(self.make_move()))
 
         # Just in case we've reached this stage unexpectedly.
