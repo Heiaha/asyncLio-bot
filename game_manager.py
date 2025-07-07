@@ -42,7 +42,7 @@ class GameManager:
 
     async def on_ping(self) -> None:
         # Sometimes the lichess game loop seems to close without the event loop sending a "gameFinish" event
-        # but still having closed the game stream. This will take case of those cases.
+        # but still having closed the game stream. This will take care of those cases.
         self.current_games = {
             game_id: game
             for game_id, game in self.current_games.items()
