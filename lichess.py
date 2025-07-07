@@ -39,7 +39,7 @@ class Lichess:
     def me(self):
         return f"{self.title} {self.username}"
 
-    async def post(self, endpoint: str, **kwargs) -> bool:
+    async def post(self, endpoint: str, **kwargs) -> None:
         start_time = time.monotonic()
         delay = 1
 
@@ -47,7 +47,7 @@ class Lichess:
             try:
                 response = await self.client.post(endpoint, **kwargs)
                 response.raise_for_status()
-                return True  # Success, exit the function
+                return  # Success, exit the function
             except httpx.RequestError:
                 logger.warning(f"Connection error on {endpoint}.")
             except httpx.HTTPStatusError as e:
@@ -58,11 +58,11 @@ class Lichess:
                 if status_code == httpx.codes.TOO_MANY_REQUESTS:
                     delay += 60
                 elif httpx.codes.is_client_error(status_code):
-                    return False  # Exit on client errors (4xx, except 429)
+                    return  # Exit on client errors (4xx, except 429)
                 #  Otherwise sleep at end of loop
             except Exception:
                 logger.exception(f"Error on {endpoint}.")
-                return False  # Unrecoverable error, exit the function
+                return  # Unrecoverable error, exit the function
 
             await asyncio.sleep(delay)
             delay = min(60, 2 * delay) + random.uniform(0, 1)
@@ -110,43 +110,43 @@ class Lichess:
         async for event in self.stream("/api/bot/online"):
             yield event
 
-    async def accept_challenge(self, challenge_id: str) -> bool:
-        return await self.post(f"/api/challenge/{challenge_id}/accept")
+    async def accept_challenge(self, challenge_id: str) -> None:
+        await self.post(f"/api/challenge/{challenge_id}/accept")
 
     async def decline_challenge(
         self, challenge_id: str, *, reason: DeclineReason = DeclineReason.GENERIC
-    ) -> bool:
-        return await self.post(
+    ) -> None:
+        await self.post(
             f"/api/challenge/{challenge_id}/decline", data={"reason": reason.value}
         )
 
-    async def cancel_challenge(self, challenge_id: str) -> bool:
-        return await self.post(f"/api/challenge/{challenge_id}/cancel")
+    async def cancel_challenge(self, challenge_id: str) -> None:
+        await self.post(f"/api/challenge/{challenge_id}/cancel")
 
-    async def abort_game(self, game_id: str) -> bool:
-        return await self.post(f"/api/bot/game/{game_id}/abort")
+    async def abort_game(self, game_id: str) -> None:
+        await self.post(f"/api/bot/game/{game_id}/abort")
 
-    async def resign_game(self, game_id: str) -> bool:
-        return await self.post(f"/api/bot/game/{game_id}/resign")
+    async def resign_game(self, game_id: str) -> None:
+        await self.post(f"/api/bot/game/{game_id}/resign")
 
-    async def upgrade_account(self) -> bool:
-        return await self.post("/api/bot/account/upgrade")
+    async def claim_victory(self, game_id: str) -> None:
+        await self.post(f"/api/bot/game/{game_id}/claim-victory")
 
-    async def claim_victory(self, game_id: str) -> bool:
-        return await self.post(f"/api/bot/game/{game_id}/claim-victory")
+    async def upgrade_account(self) -> None:
+        await self.post("/api/bot/account/upgrade")
 
     async def make_move(
         self, game_id: str, move: chess.Move, *, offer_draw: bool = False
-    ) -> bool:
-        return await self.post(
+    ) -> None:
+        await self.post(
             f"/api/bot/game/{game_id}/move/{move.uci()}",
             params={"offeringDraw": str(offer_draw).lower()},
         )
 
     async def create_challenge(
         self, opponent: str, initial_time: int, increment: int = 0
-    ) -> bool:
-        return await self.post(
+    ) -> None:
+        await self.post(
             f"/api/challenge/{opponent}",
             data={
                 "rated": str(CONFIG["matchmaking"]["rated"]).lower(),

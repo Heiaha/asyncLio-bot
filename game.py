@@ -38,7 +38,6 @@ class Game:
         }
         self.engine: chess.engine.UciProtocol | None = None
         self.loop_task: asyncio.Task | None = None
-        self.claim_time = float("inf")
 
     def __str__(self) -> str:
         white_name, black_name = self.player_names
@@ -318,19 +317,10 @@ class Game:
                 should_make_move = self.update(event) and self.is_our_turn
 
             elif event_type == GameEvent.OPPONENT_GONE:
-                self.claim_time = (
-                    time.monotonic() + event["claimWinInSeconds"]
-                    if event["gone"]
-                    else float("inf")
-                )
+                if event.get("claimWinInSeconds") == 0 and not self.is_our_turn:
+                    await self.li.claim_victory(self.id)
 
             elif event_type == GameEvent.PING:
-                if time.monotonic() > self.claim_time and not self.is_our_turn:
-                    logger.info(f"{self.id} -- Attempting to claim victory.")
-                    claim_successful = await self.li.claim_victory(self.id)
-                    if not claim_successful:
-                        self.claim_time = float("inf")
-
                 if (
                     len(self.board.move_stack) < 2
                     and not self.is_our_turn
