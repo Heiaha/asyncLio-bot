@@ -318,12 +318,11 @@ class Game:
                 should_make_move = self.update(event) and self.is_our_turn
 
             elif event_type == GameEvent.OPPONENT_GONE:
-                if event["gone"]:
-                    logger.info(f"{self.id} -- Opponent left the game.")
-                    self.claim_time = time.monotonic() + event["claimWinInSeconds"]
-                else:
-                    logger.info(f"{self.id} -- Opponent returned to the game.")
-                    self.claim_time = float("inf")
+                self.claim_time = (
+                    time.monotonic() + event["claimWinInSeconds"]
+                    if event["gone"]
+                    else float("inf")
+                )
 
             elif event_type == GameEvent.PING:
                 if time.monotonic() > self.claim_time and not self.is_our_turn:
