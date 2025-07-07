@@ -250,14 +250,15 @@ class Game:
         return result.move, result.info
 
     async def make_move(self) -> None:
-
         ponder_result_str = ""
         if len(self.board.move_stack) > 0 and self.ponder_move == self.board.peek():
             ponder_result_str = "Ponder Hit."
         elif self.ponder_move is not None:
             ponder_result_str = "Ponder Miss."
 
-        logger.info(f"{self.id} -- Searching for move from {self.board.fen()}. {ponder_result_str}")
+        logger.info(
+            f"{self.id} -- Searching for move from {self.board.fen()}. {ponder_result_str}"
+        )
         self.ponder_move = None
 
         if self.should_use_book() and (move := self.get_book_move()):

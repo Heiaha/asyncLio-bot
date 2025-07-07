@@ -49,11 +49,17 @@ class GameManager:
             if not game.is_game_over
         }
 
+        logger.debug(f"Active tasks: {len(asyncio.all_tasks())}")
+
+        if self.is_under_concurrency_limit() and self.challenge_queue:
+            await self.li.accept_challenge(self.challenge_queue.popleft())
+            return
+
         if self.should_create_challenge():
             self.last_event_time = time.monotonic()
             await self.matchmaker.challenge()
 
-        logger.debug(f"Active tasks: {len(asyncio.all_tasks())}")
+
 
     async def on_game_start(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
