@@ -59,8 +59,6 @@ class GameManager:
             self.last_event_time = time.monotonic()
             await self.matchmaker.challenge()
 
-
-
     async def on_game_start(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
         game_id = event["game"]["id"]

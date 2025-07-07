@@ -38,6 +38,7 @@ class Game:
         }
         self.engine: chess.engine.UciProtocol | None = None
         self.loop_task: asyncio.Task | None = None
+        self.claim_time = float("inf")
 
     def __str__(self) -> str:
         white_name, black_name = self.player_names
@@ -316,13 +317,27 @@ class Game:
             elif event_type == GameEvent.GAME_STATE:
                 should_make_move = self.update(event) and self.is_our_turn
 
-            elif (
-                event_type == GameEvent.PING
-                and len(self.board.move_stack) < 2
-                and not self.is_our_turn
-                and time.monotonic() - start_time >= CONFIG["abort_time"]
-            ):
-                await self.li.abort_game(self.id)
+            elif event_type == GameEvent.OPPONENT_GONE:
+                if event["gone"]:
+                    logger.info(f"{self.id} -- Opponent left the game.")
+                    self.claim_time = time.monotonic() + event["claimWinInSeconds"]
+                else:
+                    logger.info(f"{self.id} -- Opponent returned to the game.")
+                    self.claim_time = float("inf")
+
+            elif event_type == GameEvent.PING:
+                if time.monotonic() > self.claim_time:
+                    logger.info(f"{self.id} -- Attempting to claim victory.")
+                    claim_successful = await self.li.claim_victory(self.id)
+                    if not claim_successful:
+                        self.claim_time = float("inf")
+
+                if (
+                    len(self.board.move_stack) < 2
+                    and not self.is_our_turn
+                    and time.monotonic() - start_time >= CONFIG["abort_time"]
+                ):
+                    await self.li.abort_game(self.id)
 
             if self.is_game_over:
                 logger.info(self.format_result_message(event.get("state", event)))
