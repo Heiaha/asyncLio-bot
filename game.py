@@ -318,6 +318,7 @@ class Game:
 
             elif event_type == GameEvent.OPPONENT_GONE:
                 if event.get("claimWinInSeconds") == 0 and not self.is_our_turn:
+                    logger.info(f"{self.id} -- Attempting to claim victory.")
                     await self.li.claim_victory(self.id)
 
             elif event_type == GameEvent.PING:
