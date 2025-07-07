@@ -326,7 +326,7 @@ class Game:
                     self.claim_time = float("inf")
 
             elif event_type == GameEvent.PING:
-                if time.monotonic() > self.claim_time:
+                if time.monotonic() > self.claim_time and not self.is_our_turn:
                     logger.info(f"{self.id} -- Attempting to claim victory.")
                     claim_successful = await self.li.claim_victory(self.id)
                     if not claim_successful:
