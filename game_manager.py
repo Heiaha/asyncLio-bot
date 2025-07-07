@@ -46,7 +46,7 @@ class GameManager:
         self.current_games = {
             game_id: game
             for game_id, game in self.current_games.items()
-            if not game.is_game_over
+            if not game.loop_task.done()
         }
 
         logger.debug(f"Active tasks: {len(asyncio.all_tasks())}")
