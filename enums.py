@@ -15,6 +15,7 @@ class GameStatus(Enum):
     CHEAT = "cheat"
     NO_START = "noStart"
     UNKNOWN_FINISH = "unknownFinish"
+    INSUFFICIENT_MATERIAL_CLAIM = "insufficientMaterialClaim"
     VARIANT_END = "variantEnd"
 
 
