@@ -89,7 +89,7 @@ class Game:
         elif self.variant == Variant.FROM_POSITION:
             board = chess.Board(self.initial_fen)
         else:
-            VariantBoard = chess.variant.find_variant(self.variant.value)
+            VariantBoard = chess.variant.find_variant(self.variant)
             board = VariantBoard()
 
         if moves:
@@ -188,9 +188,7 @@ class Game:
 
     def get_book_move(self) -> chess.Move | None:
         books = CONFIG["books"].get(
-            Variant.STANDARD.value
-            if self.variant == Variant.FROM_POSITION
-            else self.variant.value
+            Variant.STANDARD if self.variant == Variant.FROM_POSITION else self.variant
         )
 
         if not books:

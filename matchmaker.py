@@ -16,7 +16,7 @@ class Bot:
         self._ratings = {}
         self._num_games = {}
         for perf_type in PerfType:
-            perf_info = info.get("perfs", {}).get(perf_type.value, {})
+            perf_info = info.get("perfs", {}).get(perf_type, {})
             self._ratings[perf_type] = perf_info.get("rating", 1500)
             self._num_games[perf_type] = perf_info.get("games", 0)
 
@@ -81,7 +81,7 @@ class Matchmaker:
         for bot in bots:
             if me.should_challenge(bot, perf_type):
                 logger.info(
-                    f"Challenging {bot.name} to a {perf_type.value} game with time control of {tc_seconds/60}+{tc_increment}."
+                    f"Challenging {bot.name} to a {perf_type} game with time control of {tc_seconds/60}+{tc_increment}."
                 )
 
                 # Send challenge request.

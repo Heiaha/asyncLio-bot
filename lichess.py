@@ -117,7 +117,7 @@ class Lichess:
         self, challenge_id: str, *, reason: DeclineReason = DeclineReason.GENERIC
     ) -> None:
         await self.post(
-            f"/api/challenge/{challenge_id}/decline", data={"reason": reason.value}
+            f"/api/challenge/{challenge_id}/decline", data={"reason": reason}
         )
 
     async def cancel_challenge(self, challenge_id: str) -> None:

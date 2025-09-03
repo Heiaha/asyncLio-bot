@@ -1,8 +1,8 @@
 import re
-from enum import Enum
+from enum import StrEnum
 
 
-class GameStatus(Enum):
+class GameStatus(StrEnum):
     CREATED = "created"
     STARTED = "started"
     ABORTED = "aborted"
@@ -19,7 +19,7 @@ class GameStatus(Enum):
     VARIANT_END = "variantEnd"
 
 
-class Event(Enum):
+class Event(StrEnum):
     PING = "ping"
     CHALLENGE = "challenge"
     CHALLENGE_CANCELED = "challengeCanceled"
@@ -28,7 +28,7 @@ class Event(Enum):
     GAME_FINISH = "gameFinish"
 
 
-class GameEvent(Enum):
+class GameEvent(StrEnum):
     PING = "ping"
     GAME_FULL = "gameFull"
     GAME_STATE = "gameState"
@@ -36,7 +36,7 @@ class GameEvent(Enum):
     OPPONENT_GONE = "opponentGone"
 
 
-class Variant(Enum):
+class Variant(StrEnum):
     STANDARD = "standard"
     FROM_POSITION = "fromPosition"
     ANTICHESS = "antichess"
@@ -49,10 +49,10 @@ class Variant(Enum):
     THREE_CHECK = "threeCheck"
 
     def __str__(self):
-        return re.sub("([A-Z])", r" \1", self.value).title()
+        return re.sub("([A-Z])", r" \1", self).title()
 
 
-class PerfType(Enum):
+class PerfType(StrEnum):
     BULLET = "bullet"
     BLITZ = "blitz"
     RAPID = "rapid"
@@ -67,7 +67,7 @@ class PerfType(Enum):
     THREE_CHECK = "threeCheck"
 
     def __str__(self):
-        return re.sub("([A-Z])", r" \1", self.value).title()
+        return re.sub("([A-Z])", r" \1", self).title()
 
     @classmethod
     def from_standard_tc(cls, tc_seconds: int, tc_increment: int = 0) -> "PerfType":
@@ -87,16 +87,16 @@ class PerfType(Enum):
     def from_nonstandard_variant(cls, variant: Variant) -> "PerfType":
         if variant in (Variant.STANDARD, Variant.FROM_POSITION):
             raise ValueError(f"{variant} not supported as a performance type.")
-        return cls(variant.value)
+        return cls(variant)
 
 
-class BookSelection(Enum):
+class BookSelection(StrEnum):
     WEIGHTED_RANDOM = "weighted_random"
     UNIFORM_RANDOM = "uniform_random"
     BEST_MOVE = "best_move"
 
 
-class DeclineReason(Enum):
+class DeclineReason(StrEnum):
     GENERIC = "generic"
     LATER = "later"
     TOO_FAST = "tooFast"
@@ -110,4 +110,4 @@ class DeclineReason(Enum):
     ONLY_BOT = "onlyBot"
 
     def __str__(self):
-        return re.sub("([A-Z])", r" \1", self.value).lower()
+        return re.sub("([A-Z])", r" \1", self).lower()

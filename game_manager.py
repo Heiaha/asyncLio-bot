@@ -181,7 +181,7 @@ class GameManager:
         if variant not in allowed_variants:
             return (
                 DeclineReason.STANDARD
-                if allowed_variants == [Variant.STANDARD.value]
+                if allowed_variants == [Variant.STANDARD]
                 else DeclineReason.VARIANT
             )
 
