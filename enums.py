@@ -17,6 +17,11 @@ class GameStatus(StrEnum):
     UNKNOWN_FINISH = "unknownFinish"
     INSUFFICIENT_MATERIAL_CLAIM = "insufficientMaterialClaim"
     VARIANT_END = "variantEnd"
+    UNKNOWN = "unknown"
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls.UNKNOWN
 
 
 class Event(StrEnum):
@@ -26,6 +31,11 @@ class Event(StrEnum):
     CHALLENGE_DECLINED = "challengeDeclined"
     GAME_START = "gameStart"
     GAME_FINISH = "gameFinish"
+    UNKNOWN = "unknown"
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls.UNKNOWN
 
 
 class GameEvent(StrEnum):
@@ -34,6 +44,11 @@ class GameEvent(StrEnum):
     GAME_STATE = "gameState"
     CHAT_LINE = "chatLine"
     OPPONENT_GONE = "opponentGone"
+    UNKNOWN = "unknown"
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls.UNKNOWN
 
 
 class Variant(StrEnum):
@@ -49,7 +64,7 @@ class Variant(StrEnum):
     THREE_CHECK = "threeCheck"
 
     def __str__(self):
-        return re.sub("([A-Z])", r" \1", self).title()
+        return re.sub("([A-Z])", r" \1", self.value).title()
 
 
 class PerfType(StrEnum):
@@ -67,7 +82,7 @@ class PerfType(StrEnum):
     THREE_CHECK = "threeCheck"
 
     def __str__(self):
-        return re.sub("([A-Z])", r" \1", self).title()
+        return re.sub("([A-Z])", r" \1", self.value).title()
 
     @classmethod
     def from_standard_tc(cls, tc_seconds: int, tc_increment: int = 0) -> "PerfType":
@@ -110,4 +125,4 @@ class DeclineReason(StrEnum):
     ONLY_BOT = "onlyBot"
 
     def __str__(self):
-        return re.sub("([A-Z])", r" \1", self).lower()
+        return re.sub("([A-Z])", r" \1", self.value).lower()
