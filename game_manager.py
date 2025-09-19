@@ -186,7 +186,7 @@ class GameManager:
             )
 
         if challenger_info := challenge_info["challenger"]:
-            is_bot = challenger_info["title"] == "BOT"
+            is_bot = challenger_info.get("title") == "BOT"
             their_rating = challenger_info.get("rating")
         else:
             is_bot = False
