@@ -4,9 +4,11 @@ services:
     container_name: asynclio-bot
     restart: unless-stopped
     working_dir: /app
+    env_file: .env
+    init: true
     volumes:
-      - ./engines:/app/engines
-      - ./books:/app/books
+      - ./engines:/app/engines:ro
+      - ./books:/app/books:ro
     tmpfs:
       - /tmp
     security_opt:
