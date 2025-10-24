@@ -143,7 +143,7 @@ class Game:
             score=score.pov(self.color) if (score := info.get("score")) else None,
             time=search_time,
             depth=info.get("depth", 1),
-            nps=info.get("nps"),
+            nps=info.get("nps", 0),
             pv=" ".join(m.uci() for m in pv) if (pv := info.get("pv")) else None,
         )
 
