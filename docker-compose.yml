@@ -1,5 +1,5 @@
 services:
-  bot:
+  worker:
     build: .
     container_name: asynclio-bot
     restart: unless-stopped
