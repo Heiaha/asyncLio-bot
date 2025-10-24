@@ -4,7 +4,6 @@ services:
     container_name: asynclio-bot
     restart: unless-stopped
     working_dir: /app
-    command: ["python", "main.py"]
     volumes:
       - ./engines:/app/engines
       - ./books:/app/books
