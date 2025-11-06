@@ -1,0 +1,23 @@
+services:
+  worker:
+    build: .
+    container_name: asynclio-bot
+    restart: unless-stopped
+    working_dir: /app
+    env_file: .env
+    init: true
+    volumes:
+      - ./engines:/app/engines:ro
+      - ./books:/app/books:ro
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

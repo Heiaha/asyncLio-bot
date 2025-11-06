@@ -3,10 +3,13 @@ import asyncio
 import logging
 
 import httpx
+from dotenv import load_dotenv
 
 import config
 from game_manager import GameManager
 from lichess import Lichess
+
+load_dotenv()
 
 LOGO = r"""
                               __ _             _           _   
