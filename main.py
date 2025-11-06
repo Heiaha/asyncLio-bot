@@ -1,13 +1,15 @@
 import argparse
 import asyncio
 import logging
-from typing import NoReturn
 
 import httpx
+from dotenv import load_dotenv
 
 import config
 from game_manager import GameManager
 from lichess import Lichess
+
+load_dotenv()
 
 LOGO = r"""
                               __ _             _           _   
@@ -21,7 +23,7 @@ LOGO = r"""
 logger = logging.getLogger(__name__)
 
 
-async def main(args: argparse.Namespace) -> NoReturn:
+async def main(args: argparse.Namespace):
     logging_handlers = [logging.StreamHandler()]
     if args.log:
         logging_handlers.append(logging.FileHandler(args.log))
