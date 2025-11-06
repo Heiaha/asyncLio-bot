@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import logging
-from typing import NoReturn
 
 import httpx
 
@@ -21,7 +20,7 @@ LOGO = r"""
 logger = logging.getLogger(__name__)
 
 
-async def main(args: argparse.Namespace) -> NoReturn:
+async def main(args: argparse.Namespace):
     logging_handlers = [logging.StreamHandler()]
     if args.log:
         logging_handlers.append(logging.FileHandler(args.log))
