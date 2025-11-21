@@ -81,7 +81,11 @@ class Matchmaker:
         for bot in bots:
             if me.should_challenge(bot, perf_type):
                 logger.info(
-                    f"Challenging {bot.name} to a {perf_type} game with time control of {tc_seconds/60}+{tc_increment}."
+                    "Challenging %s to a %s game with time control of %d+%d",
+                    bot.name,
+                    perf_type,
+                    tc_seconds / 60,
+                    tc_increment,
                 )
 
                 # Send challenge request.

@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class Lichess:
+    ATTEMPTS = 10
+
     async def __aenter__(self):
         headers = {
             "Authorization": f"Bearer {CONFIG['token']}",
@@ -33,69 +35,70 @@ class Lichess:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.client.aclose()
-        logger.debug("Client closed.")
+        logger.debug("Client closed")
 
     @property
     def me(self):
         return f"{self.title} {self.username}"
 
     async def post(self, endpoint: str, **kwargs) -> None:
-        start_time = time.monotonic()
-        delay = 1
-
-        while time.monotonic() - start_time < 600:
+        for attempt in range(self.ATTEMPTS):
             try:
                 response = await self.client.post(endpoint, **kwargs)
-                response.raise_for_status()
-                return  # Success, exit the function
             except httpx.RequestError:
-                logger.warning(f"Connection error on {endpoint}.")
-            except httpx.HTTPStatusError as e:
-                status_code = e.response.status_code
-                logger.warning(
-                    f"Error {status_code} ({httpx.codes.get_reason_phrase(status_code)}) on {endpoint}."
-                )
-                if status_code == httpx.codes.TOO_MANY_REQUESTS:
-                    delay += 60
-                elif httpx.codes.is_client_error(status_code):
-                    return  # Exit on client errors (4xx, except 429)
-                #  Otherwise sleep at end of loop
-            except Exception:
-                logger.exception(f"Error on {endpoint}.")
-                return  # Unrecoverable error, exit the function
+                logger.warning("Connection error on %s", endpoint)
+            except Exception as e:
+                logger.exception("Error %s on %s", e, endpoint)
+                return
+            else:
+                if response.is_success:
+                    return
 
-            await asyncio.sleep(delay)
-            delay = min(60, 2 * delay) + random.uniform(0, 1)
-        logger.warning(f"Giving up requests on {endpoint}.")
+                if response.status_code == httpx.codes.TOO_MANY_REQUESTS:
+                    await asyncio.sleep(60)
+                elif response.is_client_error:
+                    logger.warning(
+                        "Error %d (%s) on %s.",
+                        response.status_code,
+                        httpx.codes.get_reason_phrase(response.status_code),
+                        endpoint,
+                    )
+                    return
+
+            await asyncio.sleep(2**attempt + random.random())
+
+        logger.warning("Giving up requests on %s", endpoint)
 
     async def stream(self, endpoint: str):
+        attempt = 0
         while True:
-            delay = random.uniform(0, 2)
             try:
                 async with self.client.stream("GET", endpoint) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if line.strip():
-                            event = json.loads(line)
-                            logger.debug(f"Event {endpoint}: {event}")
-                        else:
-                            event = {"type": "ping"}
-                        yield event
+                    if response.is_success:
+                        async for line in response.aiter_lines():
+                            if line.strip():
+                                event = json.loads(line)
+                                logger.debug("Event %s: %s", endpoint, event)
+                            else:
+                                event = {"type": "ping"}
+                            yield event
+                        return
+            except Exception as e:
+                logger.exception("Error %s on event stream %s", e, endpoint)
+            else:
+                if response.status_code == httpx.codes.TOO_MANY_REQUESTS:
+                    await asyncio.sleep(60)  # Wait an extra minute before retrying
+                elif response.is_client_error:
+                    logger.warning(
+                        "Error %d (%s) on %s.",
+                        response.status_code,
+                        httpx.codes.get_reason_phrase(response.status_code),
+                        endpoint,
+                    )
                     return
-            except httpx.HTTPStatusError as e:
-                status_code = e.response.status_code
-                logger.warning(
-                    f"Error {status_code} ({httpx.codes.get_reason_phrase(status_code)}) on {endpoint}."
-                )
-                if status_code == httpx.codes.TOO_MANY_REQUESTS:
-                    delay += 60
-                elif httpx.codes.is_client_error(status_code):
-                    return  # Exit on client errors (4xx, except 429)
-                #  Otherwise sleep at end of loop
-            except Exception:
-                logger.exception(f"Error in event stream {endpoint}.")
 
-            await asyncio.sleep(delay)
+            await asyncio.sleep(2**attempt + random.random())
+            attempt += 1
 
     async def event_stream(self) -> AsyncIterator[dict]:
         while True:  # in case the event stream expires

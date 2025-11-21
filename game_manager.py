@@ -49,7 +49,7 @@ class GameManager:
             if not game.loop_task.done()
         }
 
-        logger.debug(f"Active tasks: {len(asyncio.all_tasks())}")
+        logger.debug("Active tasks: %d", len(asyncio.all_tasks()))
 
         if self.is_under_concurrency_limit() and self.challenge_queue:
             await self.li.accept_challenge(self.challenge_queue.popleft())
@@ -77,19 +77,23 @@ class GameManager:
         self.current_games[game_id] = game
 
         logger.info(
-            f"Games: {len(self.current_games)}. Challenges: {len(self.challenge_queue)}."
+            "Games: %d, Challenges: %d",
+            len(self.current_games),
+            len(self.challenge_queue),
         )
-        logger.info(f"{game} starting.")
+        logger.info("%s starting", game)
 
     async def on_game_finish(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
         if (game_id := event["game"]["id"]) in self.current_games:
             game = self.current_games.pop(game_id)
-            logger.info(f"{game} finished.")
+            logger.info("%s finished", game)
             await game.loop_task
 
         logger.info(
-            f"Games: {len(self.current_games)}. Challenges: {len(self.challenge_queue)}."
+            "Games: %d, Challenges: %d",
+            len(self.current_games),
+            len(self.challenge_queue),
         )
 
         if self.is_under_concurrency_limit() and self.challenge_queue:
@@ -110,10 +114,13 @@ class GameManager:
         if challenger_name == self.li.username:
             return
 
-        logger.info(f"{challenge_id} -- Challenger: {challenger_name}.")
+        logger.info("%s -- Challenger: %s", challenge_id, challenger_name)
         if decline_reason := self.check_decline_reason(event):
             logger.info(
-                f"{challenge_id} -- Declining challenge from {challenger_name} for reason: {decline_reason}."
+                "%s -- Declining challenge from %s for reason: %s",
+                challenge_id,
+                challenger_name,
+                decline_reason,
             )
             await self.li.decline_challenge(challenge_id, reason=decline_reason)
             return
@@ -124,17 +131,21 @@ class GameManager:
 
         self.challenge_queue.append(challenge_id)
         logger.info(
-            f"Games: {len(self.current_games)}. Challenges: {len(self.challenge_queue)}."
+            "Games: %d, Challenges: %d",
+            len(self.current_games),
+            len(self.challenge_queue),
         )
 
     def on_challenge_canceled(self, event: dict) -> None:
         self.last_event_time = time.monotonic()
         challenge_id = event["challenge"]["id"]
-        logger.info(f"{challenge_id} -- Challenge canceled.")
+        logger.info("%s -- Challenge canceled.", challenge_id)
         if challenge_id in self.challenge_queue:
             self.challenge_queue.remove(challenge_id)
         logger.info(
-            f"Games: {len(self.current_games)}. Challenges: {len(self.challenge_queue)}."
+            "Games: %d, Challenges: %d",
+            len(self.current_games),
+            len(self.challenge_queue),
         )
 
     def is_under_concurrency_limit(self) -> bool:

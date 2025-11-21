@@ -41,7 +41,7 @@ class Game:
 
     def __str__(self) -> str:
         white_name, black_name = self.player_names
-        return f"{self.id} -- {self.variant}: {white_name} v. {black_name}"
+        return f"{self.id} -- {self.variant}: {white_name} v {black_name}"
 
     @property
     def player_names(self) -> tuple[str, str]:
@@ -60,7 +60,7 @@ class Game:
         return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
 
     async def start_engine(self) -> None:
-        logger.debug(f"{self.id} -- Starting engine {CONFIG['engine']['path']}.")
+        logger.debug("%s -- Starting engine %s", self.id, CONFIG["engine"]["path"])
         transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
         if options := CONFIG["engine"].get("uci_options"):
             await engine.configure(options)
@@ -251,12 +251,15 @@ class Game:
     async def make_move(self) -> None:
         ponder_result_str = ""
         if len(self.board.move_stack) > 0 and self.ponder_move == self.board.peek():
-            ponder_result_str = "Ponder Hit."
+            ponder_result_str = ": Ponder Hit"
         elif self.ponder_move is not None:
-            ponder_result_str = "Ponder Miss."
+            ponder_result_str = ": Ponder Miss"
 
         logger.info(
-            f"{self.id} -- Searching for move from {self.board.fen()}. {ponder_result_str}"
+            "%s -- Searching for move from: %s%s",
+            self.id,
+            self.board.fen(),
+            ponder_result_str,
         )
         self.ponder_move = None
 
@@ -287,13 +290,13 @@ class Game:
             return
 
         if self.should_resign():
-            logger.info(f"{self.id} -- Resigning game.")
+            logger.info("%s -- Resigning game", self.id)
             await self.li.resign_game(self.id)
             return
 
         offer_draw = self.should_draw()
         if offer_draw:
-            logger.info(f"{self.id} -- Offering draw.")
+            logger.info("%s -- Offering draw", self.id)
 
         await self.li.make_move(self.id, move, offer_draw=offer_draw)
 
@@ -317,7 +320,7 @@ class Game:
 
             elif event_type == GameEvent.OPPONENT_GONE:
                 if event.get("claimWinInSeconds") == 0 and not self.is_our_turn:
-                    logger.info(f"{self.id} -- Attempting to claim victory.")
+                    logger.info("%s -- Attempting to claim victory", self.id)
                     await self.li.claim_victory(self.id)
 
             elif event_type == GameEvent.PING:

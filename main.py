@@ -45,19 +45,17 @@ async def main(args: argparse.Namespace):
     async with Lichess() as li:
         if args.upgrade:
             if li.title == "BOT":
-                logger.warning(
-                    f"{li.username} is already a BOT account. Run asyncLio-bot without the upgrade flag in the future."
-                )
+                logger.warning("%s is already a BOT account", li.username)
             else:
                 await li.upgrade_account()
-                logger.info(f"Upgraded {li.username} to a BOT account.")
+                logger.info("Upgraded %s to a BOT account", li.username)
                 return
 
         if li.title != "BOT":
-            logger.critical("asyncLio-bot can only be used by BOT accounts.")
+            logger.critical("asyncLio-bot can only be used by BOT accounts")
             return
 
-        logger.info(f"Logged in as {li.me}.")
+        logger.info("Logged in as %s", li.me)
         await GameManager(li).watch_event_stream()
 
 
