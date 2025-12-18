@@ -100,7 +100,6 @@ class GameManager:
             await self.li.accept_challenge(self.challenge_queue.popleft())
 
     async def on_challenge(self, event: dict) -> None:
-        self.last_event_time = time.monotonic()
         challenge_id = event["challenge"]["id"]
 
         if challenge_id in self.challenge_queue:
