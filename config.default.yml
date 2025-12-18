@@ -80,6 +80,6 @@ matchmaking:
     - 0
     - 1
   max_rating_diff: 4000       # Maximum rating distance to opponent.
-  min_games: 250              # Minimum games opponent must have played.
+  min_games: 50               # Minimum games opponent must have played in the chosen variant (including sub-division of standard into bullet, blitz etc.)
   timeout: 5                  # Timeout (in minutes) between nothing happening and issuing a challenge.
   rated: false                # Whether to challenge rated or casual.
