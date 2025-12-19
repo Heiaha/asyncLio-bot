@@ -25,10 +25,6 @@ class Bot:
             return self.name == other.name
         return NotImplemented
 
-    @property
-    def total_games(self) -> int:
-        return sum(self._num_games.values())
-
     def num_games(self, perf_type) -> int:
         return self._num_games[perf_type]
 
@@ -44,7 +40,7 @@ class Bot:
         ):
             return False
 
-        if other.total_games < CONFIG["matchmaking"]["min_games"]:
+        if other.num_games(perf_type) < CONFIG["matchmaking"]["min_games"]:
             return False
 
         return True
