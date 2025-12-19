@@ -229,6 +229,6 @@ class GameManager:
             rating_diff = abs(my_rating - their_rating)
             max_rating_diff = max_bot_rating_diff if is_bot else max_human_rating_diff
             if rating_diff > max_rating_diff:
-                return DeclineReason.GENERIC
+                return DeclineReason.RATING_DIFF
 
         return None

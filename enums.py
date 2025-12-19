@@ -123,6 +123,7 @@ class DeclineReason(StrEnum):
     VARIANT = "variant"
     NO_BOT = "noBot"
     ONLY_BOT = "onlyBot"
+    RATING_DIFF = "ratingDiff"
 
     def __str__(self):
         return re.sub("([A-Z])", r" \1", self.value).lower()
