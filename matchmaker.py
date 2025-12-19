@@ -25,7 +25,6 @@ class Bot:
             return self.name == other.name
         return NotImplemented
 
-    @property
     def num_games(self, perf_type) -> int:
         return self._num_games[perf_type]
 
