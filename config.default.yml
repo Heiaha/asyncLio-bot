@@ -1,9 +1,11 @@
 concurrency: 1                # Number of games to play simultaneously.
 abort_time: 20                # Amount of time (in s) to abort game start after no activity.
 move_overhead : 2000          # Amount of time (in ms) to subtract from each move before being given to the engine.
+
 engine:
   path: /path/to/engine
   ponder: false
+  fake_think: false           # Pretend to think instead of moving instantly (for limited search levels).
   uci_options:                # Arbitrary UCI options passed to the engine. Can be commented out or changed.
 #    Threads: 1               # Max CPU threads the engine can use.
 #    Hash: 128                # Hash size (in MB).

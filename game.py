@@ -217,16 +217,21 @@ class Game:
     async def get_engine_move(self) -> (chess.Move, chess.engine.InfoDict):
         clock = self.clock.copy()
 
-        clock_name = "white_clock" if self.color == chess.WHITE else "black_clock"
-        clock[clock_name] = max(
-            0, clock[clock_name] - CONFIG.get("move_overhead", 0) / 1000
-        )
+        move_overhead = CONFIG.get("move_overhead", 0) / 1000
+        color = "white" if self.color == chess.WHITE else "black"
+        clock[color + '_clock'] = max(0, clock[color + '_clock'] - move_overhead)
 
-        limit = (
-            chess.engine.Limit(**clock)
-            if len(self.board.move_stack) >= 2
-            else chess.engine.Limit(time=10)
-        )
+        # The first move is special. Lichess allows 30' max before the game is auto-aborted. But
+        # many opponents don't even have that much patience. So we use 10' fixed time.
+        first_move = len(self.board.move_stack) < 2
+        limit = chess.engine.Limit(time=10) if first_move else chess.engine.Limit(**clock)
+
+        min_sleep_task = None
+        if CONFIG['engine'].get('fake_think', False) and not first_move:
+            # Calculate min_sleep_time per move for 40 moves ahead
+            min_sleep_time = clock[color + '_clock'] / 40 + clock[color + '_inc'] - move_overhead
+            if min_sleep_time > 0:
+                min_sleep_task = asyncio.create_task(asyncio.sleep(min_sleep_time))
 
         result = await self.engine.play(
             self.board,
@@ -239,6 +244,9 @@ class Game:
 
         if not result.move:
             raise RuntimeError(f"{self.id} -- Engine could not make a move.")
+
+        if min_sleep_task is not None:
+            await min_sleep_task
 
         self.scores.append(
             result.info.get(
