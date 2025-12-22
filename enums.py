@@ -112,17 +112,14 @@ class BookSelection(StrEnum):
 
 
 class DeclineReason(StrEnum):
-    GENERIC = "generic"
-    LATER = "later"
-    TOO_FAST = "tooFast"
-    TOO_SLOW = "tooSlow"
-    TIME_CONTROL = "timeControl"
-    RATED = "rated"
-    CASUAL = "casual"
-    STANDARD = "standard"
-    VARIANT = "variant"
-    NO_BOT = "noBot"
-    ONLY_BOT = "onlyBot"
-
-    def __str__(self):
-        return re.sub("([A-Z])", r" \1", self.value).lower()
+    GENERIC = "Generic"
+    LATER = "Later"
+    TOO_FAST = "TooFast"
+    TOO_SLOW = "TooSlow"
+    TIME_CONTROL = "TimeControl"
+    RATED = "Rated"
+    CASUAL = "Casual"
+    STANDARD = "Standard"
+    VARIANT = "Variant"
+    NO_BOT = "NoBot"
+    ONLY_BOT = "OnlyBot"
