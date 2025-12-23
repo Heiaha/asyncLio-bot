@@ -15,7 +15,8 @@ def load_config(filename: str):
         except Exception as e:
             logger.critical("There is a problem with your config.yml file.")
             raise e
-    config["token"] = os.getenv("LICHESS_TOKEN")
+    if "LICHESS_BOT_TOKEN" in os.environ:
+        config["token"] = os.environ["LICHESS_BOT_TOKEN"]
 
     global CONFIG
     CONFIG.clear()

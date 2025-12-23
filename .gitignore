@@ -1,0 +1,3 @@
+*.yml
+!config.default.yml
+!docker-compose.yml
