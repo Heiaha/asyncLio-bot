@@ -1,6 +1,6 @@
 from typing import Union
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
 
 from enums import Event, GameEvent, GameStatus, Variant
 
@@ -15,19 +15,6 @@ class Account(LichessModel):
     title: str = ""
 
 
-# Shared sub-models
-class VariantInfo(LichessModel):
-    key: Variant
-
-
-class StatusInfo(LichessModel):
-    name: GameStatus
-
-
-class Opponent(LichessModel):
-    username: str
-
-
 class TimeControl(LichessModel):
     limit: int = 0
     increment: int = 0
@@ -38,9 +25,9 @@ class GameEventInfo(LichessModel):
     id: str = Field(validation_alias=AliasChoices("id", "gameId"))
     color: str
     fen: str
-    variant: VariantInfo
-    status: StatusInfo
-    opponent: Opponent
+    variant: Variant = Field(validation_alias=AliasPath("variant", "key"))
+    status: GameStatus = Field(validation_alias=AliasPath("status", "name"))
+    opponent: str = Field(validation_alias=AliasPath("opponent", "username"))
 
 
 class GameStartEvent(LichessModel):
@@ -63,7 +50,7 @@ class ChallengeInfo(LichessModel):
     id: str
     rated: bool
     speed: str
-    variant: VariantInfo
+    variant: Variant = Field(validation_alias=AliasPath("variant", "key"))
     challenger: ChallengePlayer | None = None
     dest_user: ChallengePlayer | None = Field(default=None, alias="destUser")
     time_control: TimeControl = Field(alias="timeControl")

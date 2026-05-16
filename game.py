@@ -22,10 +22,10 @@ class Game:
         self.color: chess.Color = (
             chess.WHITE if event.game.color == "white" else chess.BLACK
         )
-        self.opponent: str = event.game.opponent.username
+        self.opponent: str = event.game.opponent
         self.initial_fen: str = event.game.fen
-        self.variant: Variant = event.game.variant.key
-        self.status: GameStatus = event.game.status.name
+        self.variant: Variant = event.game.variant
+        self.status: GameStatus = event.game.status
         self.scores: list[chess.engine.PovScore] = []
         self.board: chess.Board = self.make_board()
         self.ponder_move: chess.Move | None = None

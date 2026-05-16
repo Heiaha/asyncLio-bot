@@ -175,7 +175,7 @@ class GameManager:
         if not challenge.rated and "casual" not in cfg.modes:
             return DeclineReason.RATED
 
-        if challenge.variant.key not in cfg.variants:
+        if challenge.variant not in cfg.variants:
             return (
                 DeclineReason.STANDARD
                 if cfg.variants == [Variant.STANDARD]
