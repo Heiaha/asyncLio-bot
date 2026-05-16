@@ -30,8 +30,8 @@ class Lichess:
         headers = {
             "Authorization": f"Bearer {CONFIG.token}",
         }
-        account = Account.model_validate(
-            httpx.get("https://lichess.org/api/account", headers=headers).json()
+        account = Account.model_validate_json(
+            httpx.get("https://lichess.org/api/account", headers=headers).content
         )
         headers["User-Agent"] = f"asyncLio-bot user:{account.username}"
 
