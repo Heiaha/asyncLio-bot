@@ -55,7 +55,7 @@ class Matchmaker:
         bots = [
             Bot(info)
             async for info in self.li.get_online_bots()
-            # if not info.disabled and not info.tos_violation
+            if not info.disabled and not info.tos_violation
         ]
         
         try:
