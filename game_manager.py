@@ -148,10 +148,10 @@ class GameManager:
         )
 
     def is_under_concurrency_limit(self) -> bool:
-        return len(self.current_games) < CONFIG["concurrency"]
+        return len(self.current_games) < CONFIG.concurrency
 
     def should_create_challenge(self) -> bool:
-        if not CONFIG["matchmaking"]["enabled"]:
+        if not CONFIG.matchmaking.enabled:
             return False
 
         if len(self.current_games) > 0:
@@ -159,37 +159,26 @@ class GameManager:
 
         return (
             time.monotonic() - self.last_event_time
-            >= max(1, CONFIG["matchmaking"]["timeout"]) * 60
+            >= max(1, CONFIG.matchmaking.timeout) * 60
         )
 
     @staticmethod
     def check_decline_reason(event: ChallengeEvent) -> DeclineReason | None:
-        challenge_config = CONFIG["challenge"]
-        if not challenge_config["enabled"]:
+        cfg = CONFIG.challenge
+        if not cfg.enabled:
             return DeclineReason.GENERIC
 
-        allowed_modes = challenge_config["modes"]
-        allowed_opponents = challenge_config["opponents"]
-        allowed_variants = challenge_config["variants"]
-        allowed_tcs = challenge_config["time_controls"]
-        min_increment = challenge_config.get("min_increment", 0)
-        max_increment = challenge_config.get("max_increment", 180)
-        min_initial = challenge_config.get("min_initial", 0)
-        max_initial = challenge_config.get("max_initial", 315360000)
-        max_bot_rating_diff = challenge_config["max_rating_diffs"].get("bot", 4000)
-        max_human_rating_diff = challenge_config["max_rating_diffs"].get("human", 4000)
-
         challenge = event.challenge
-        if challenge.rated and "rated" not in allowed_modes:
+        if challenge.rated and "rated" not in cfg.modes:
             return DeclineReason.CASUAL
 
-        if not challenge.rated and "casual" not in allowed_modes:
+        if not challenge.rated and "casual" not in cfg.modes:
             return DeclineReason.RATED
 
-        if challenge.variant.key not in allowed_variants:
+        if challenge.variant.key not in cfg.variants:
             return (
                 DeclineReason.STANDARD
-                if allowed_variants == [Variant.STANDARD]
+                if cfg.variants == [Variant.STANDARD]
                 else DeclineReason.VARIANT
             )
 
@@ -202,26 +191,28 @@ class GameManager:
 
         my_rating = challenge.dest_user.rating if challenge.dest_user else None
 
-        if is_bot and "bot" not in allowed_opponents:
+        if is_bot and "bot" not in cfg.opponents:
             return DeclineReason.NO_BOT
 
-        if not is_bot and "human" not in allowed_opponents:
+        if not is_bot and "human" not in cfg.opponents:
             return DeclineReason.ONLY_BOT
 
-        if challenge.speed not in allowed_tcs:
+        if challenge.speed not in cfg.time_controls:
             return DeclineReason.TIME_CONTROL
 
         initial = challenge.time_control.limit
         increment = challenge.time_control.increment
-        if initial < min_initial or increment < min_increment:
+        if initial < cfg.min_initial or increment < cfg.min_increment:
             return DeclineReason.TOO_FAST
 
-        if initial > max_initial or increment > max_increment:
+        if initial > cfg.max_initial or increment > cfg.max_increment:
             return DeclineReason.TOO_SLOW
 
         if challenge.rated and my_rating is not None and their_rating is not None:
             rating_diff = abs(my_rating - their_rating)
-            max_rating_diff = max_bot_rating_diff if is_bot else max_human_rating_diff
+            max_rating_diff = (
+                cfg.max_rating_diffs.bot if is_bot else cfg.max_rating_diffs.human
+            )
             if rating_diff > max_rating_diff:
                 return DeclineReason.GENERIC
 

@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import random
-import time
 from typing import AsyncIterator
 
 import chess
@@ -12,8 +11,10 @@ from config import CONFIG
 from enums import DeclineReason
 from models import (
     Account,
+    GamePing,
     GameStreamEvent,
     OnlineBot,
+    PingEvent,
     StreamEvent,
     parse_event,
     parse_game_event,
@@ -27,7 +28,7 @@ class Lichess:
 
     async def __aenter__(self):
         headers = {
-            "Authorization": f"Bearer {CONFIG['token']}",
+            "Authorization": f"Bearer {CONFIG.token}",
         }
         account = Account.model_validate(
             httpx.get("https://lichess.org/api/account", headers=headers).json()
@@ -163,10 +164,10 @@ class Lichess:
         await self.post(
             f"/api/challenge/{opponent}",
             data={
-                "rated": str(CONFIG["matchmaking"]["rated"]).lower(),
+                "rated": str(CONFIG.matchmaking.rated).lower(),
                 "clock.limit": initial_time,
                 "clock.increment": increment,
-                "variant": CONFIG["matchmaking"]["variant"],
+                "variant": CONFIG.matchmaking.variant.value,
                 "color": "random",
             },
         )

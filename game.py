@@ -61,9 +61,9 @@ class Game:
         return self.status not in (GameStatus.STARTED, GameStatus.CREATED)
 
     async def start_engine(self) -> None:
-        logger.debug("%s -- Starting engine %s", self.id, CONFIG["engine"]["path"])
-        transport, engine = await chess.engine.popen_uci(CONFIG["engine"]["path"])
-        if options := CONFIG["engine"].get("uci_options"):
+        logger.debug("%s -- Starting engine %s", self.id, CONFIG.engine.path)
+        transport, engine = await chess.engine.popen_uci(CONFIG.engine.path)
+        if options := CONFIG.engine.uci_options:
             await engine.configure(options)
         self.engine = engine
 
@@ -99,30 +99,32 @@ class Game:
         return board
 
     def should_draw(self) -> bool:
-        if not CONFIG["draw"]["enabled"]:
+        cfg = CONFIG.draw
+        if not cfg.enabled:
             return False
 
-        if self.board.fullmove_number < CONFIG["draw"]["min_game_length"]:
+        if self.board.fullmove_number < cfg.min_game_length:
             return False
 
-        if len(self.scores) < CONFIG["draw"]["moves"]:
+        if len(self.scores) < cfg.moves:
             return False
 
         return all(
-            abs(score.relative) <= chess.engine.Cp(CONFIG["draw"]["score"])
-            for score in self.scores[-CONFIG["draw"]["moves"] :]
+            abs(score.relative) <= chess.engine.Cp(cfg.score)
+            for score in self.scores[-cfg.moves :]
         )
 
     def should_resign(self) -> bool:
-        if not CONFIG["resign"]["enabled"]:
+        cfg = CONFIG.resign
+        if not cfg.enabled:
             return False
 
-        if len(self.scores) < CONFIG["resign"]["moves"]:
+        if len(self.scores) < cfg.moves:
             return False
 
         return all(
-            score.relative <= chess.engine.Cp(CONFIG["resign"]["score"])
-            for score in self.scores[-CONFIG["resign"]["moves"] :]
+            score.relative <= chess.engine.Cp(cfg.score)
+            for score in self.scores[-cfg.moves :]
         )
 
     def format_book_move_message(self, move: chess.Move) -> str:
@@ -183,20 +185,20 @@ class Game:
         return f"{self.id} -- {message}"
 
     def should_use_book(self):
-        if not CONFIG["books"]["enabled"]:
+        if not CONFIG.books.enabled:
             return False
 
-        return self.board.fullmove_number <= CONFIG["books"].get("depth", 10)
+        return self.board.fullmove_number <= CONFIG.books.depth
 
     def get_book_move(self) -> chess.Move | None:
-        books = CONFIG["books"].get(
+        books = CONFIG.books.for_variant(
             Variant.STANDARD if self.variant == Variant.FROM_POSITION else self.variant
         )
 
         if not books:
             return None
 
-        selection = BookSelection(CONFIG["books"]["selection"])
+        selection = CONFIG.books.selection
         board = self.board.copy()
         for book in books:
             with chess.polyglot.open_reader(book) as reader:
@@ -220,7 +222,7 @@ class Game:
 
         clock_name = "white_clock" if self.color == chess.WHITE else "black_clock"
         clock[clock_name] = max(
-            0, clock[clock_name] - CONFIG.get("move_overhead", 0) / 1000
+            0, clock[clock_name] - CONFIG.move_overhead / 1000
         )
 
         limit = (
@@ -233,7 +235,7 @@ class Game:
             self.board,
             limit=limit,
             info=chess.engine.INFO_ALL,
-            ponder=CONFIG["engine"].get("ponder", False),
+            ponder=CONFIG.engine.ponder,
         )
 
         self.ponder_move = result.ponder
@@ -326,7 +328,7 @@ class Game:
                 case GamePing() if (
                     len(self.board.move_stack) < 2
                     and not self.is_our_turn
-                    and time.monotonic() - start_time >= CONFIG["abort_time"]
+                    and time.monotonic() - start_time >= CONFIG.abort_time
                 ):
                     await self.li.abort_game(self.id)
 

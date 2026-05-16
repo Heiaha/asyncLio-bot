@@ -37,11 +37,11 @@ class Bot:
             return False
         if (
             abs(self.rating(perf_type) - other.rating(perf_type))
-            > CONFIG["matchmaking"]["max_rating_diff"]
+            > CONFIG.matchmaking.max_rating_diff
         ):
             return False
 
-        if other.num_games(perf_type) < CONFIG["matchmaking"]["min_games"]:
+        if other.num_games(perf_type) < CONFIG.matchmaking.min_games:
             return False
 
         return True
@@ -66,9 +66,9 @@ class Matchmaker:
 
         random.shuffle(bots)
 
-        variant = Variant(CONFIG["matchmaking"]["variant"])
-        tc_seconds = random.choice(CONFIG["matchmaking"]["initial_times"])
-        tc_increment = random.choice(CONFIG["matchmaking"]["increments"])
+        variant = CONFIG.matchmaking.variant
+        tc_seconds = random.choice(CONFIG.matchmaking.initial_times)
+        tc_increment = random.choice(CONFIG.matchmaking.increments)
         perf_type = (
             PerfType.from_standard_tc(tc_seconds, tc_increment)
             if variant == Variant.STANDARD
