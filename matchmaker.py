@@ -5,20 +5,21 @@ from typing import Any
 from config import CONFIG
 from enums import PerfType, Variant
 from lichess import Lichess
+from models import OnlineBot, PerfInfo
 
 logger = logging.getLogger(__name__)
 
 
 class Bot:
-    def __init__(self, info) -> None:
-        self.name = info["username"]
+    def __init__(self, info: OnlineBot) -> None:
+        self.name = info.username
 
         self._ratings = {}
         self._num_games = {}
         for perf_type in PerfType:
-            perf_info = info.get("perfs", {}).get(perf_type, {})
-            self._ratings[perf_type] = perf_info.get("rating", 1500)
-            self._num_games[perf_type] = perf_info.get("games", 0)
+            perf = info.perfs.get(perf_type, PerfInfo())
+            self._ratings[perf_type] = perf.rating
+            self._num_games[perf_type] = perf.games
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, Bot):
@@ -54,7 +55,7 @@ class Matchmaker:
         bots = [
             Bot(info)
             async for info in self.li.get_online_bots()
-            if not info.get("disabled") and not info.get("tosViolation")
+            if not info.disabled and not info.tos_violation
         ]
 
         try:

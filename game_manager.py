@@ -5,10 +5,16 @@ from collections import deque
 from typing import NoReturn
 
 from config import CONFIG
-from enums import Event, DeclineReason, Variant
+from enums import DeclineReason, Event, Variant
 from game import Game
 from lichess import Lichess
 from matchmaker import Matchmaker
+from models import (
+    ChallengeCanceledEvent,
+    ChallengeEvent,
+    GameFinishEvent,
+    GameStartEvent,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,22 +29,17 @@ class GameManager:
 
     async def watch_event_stream(self) -> NoReturn:
         async for event in self.li.event_stream():
-            event_type = Event(event["type"])
-
-            if event_type == Event.PING:
-                await self.on_ping()
-
-            elif event_type == Event.GAME_START:
-                await self.on_game_start(event)
-
-            elif event_type == Event.GAME_FINISH:
-                await self.on_game_finish(event)
-
-            elif event_type == Event.CHALLENGE:
-                await self.on_challenge(event)
-
-            elif event_type == Event.CHALLENGE_CANCELED:
-                self.on_challenge_canceled(event)
+            match event.type:
+                case Event.PING:
+                    await self.on_ping()
+                case Event.GAME_START:
+                    await self.on_game_start(event)
+                case Event.GAME_FINISH:
+                    await self.on_game_finish(event)
+                case Event.CHALLENGE:
+                    await self.on_challenge(event)
+                case Event.CHALLENGE_CANCELED:
+                    self.on_challenge_canceled(event)
 
     async def on_ping(self) -> None:
         # Sometimes the lichess game loop seems to close without the event loop sending a "gameFinish" event
@@ -59,9 +60,9 @@ class GameManager:
             self.last_event_time = time.monotonic()
             await self.matchmaker.challenge()
 
-    async def on_game_start(self, event: dict) -> None:
+    async def on_game_start(self, event: GameStartEvent) -> None:
         self.last_event_time = time.monotonic()
-        game_id = event["game"]["id"]
+        game_id = event.game.id
 
         if game_id in self.current_games:
             return
@@ -83,9 +84,9 @@ class GameManager:
         )
         logger.info("%s starting", game)
 
-    async def on_game_finish(self, event: dict) -> None:
+    async def on_game_finish(self, event: GameFinishEvent) -> None:
         self.last_event_time = time.monotonic()
-        if (game_id := event["game"]["id"]) in self.current_games:
+        if (game_id := event.game.id) in self.current_games:
             game = self.current_games.pop(game_id)
             logger.info("%s finished", game)
             await game.loop_task
@@ -99,45 +100,44 @@ class GameManager:
         if self.is_under_concurrency_limit() and self.challenge_queue:
             await self.li.accept_challenge(self.challenge_queue.popleft())
 
-    async def on_challenge(self, event: dict) -> None:
-        challenge_id = event["challenge"]["id"]
+    async def on_challenge(self, event: ChallengeEvent) -> None:
+        challenge = event.challenge
 
-        if challenge_id in self.challenge_queue:
+        if challenge.id in self.challenge_queue:
             return
 
-        if challenger_info := event["challenge"]["challenger"]:
-            challenger_name = challenger_info["name"]
-        else:
-            challenger_name = "Anonymous"
+        challenger_name = (
+            challenge.challenger.name if challenge.challenger else "Anonymous"
+        )
 
         if challenger_name == self.li.username:
             return
 
-        logger.info("%s -- Challenger: %s", challenge_id, challenger_name)
+        logger.info("%s -- Challenger: %s", challenge.id, challenger_name)
         if decline_reason := self.check_decline_reason(event):
             logger.info(
                 "%s -- Declining challenge from %s for reason: %s",
-                challenge_id,
+                challenge.id,
                 challenger_name,
                 decline_reason,
             )
-            await self.li.decline_challenge(challenge_id, reason=decline_reason)
+            await self.li.decline_challenge(challenge.id, reason=decline_reason)
             return
 
         if self.is_under_concurrency_limit():
-            await self.li.accept_challenge(challenge_id)
+            await self.li.accept_challenge(challenge.id)
             return
 
-        self.challenge_queue.append(challenge_id)
+        self.challenge_queue.append(challenge.id)
         logger.info(
             "Games: %d, Challenges: %d",
             len(self.current_games),
             len(self.challenge_queue),
         )
 
-    def on_challenge_canceled(self, event: dict) -> None:
+    def on_challenge_canceled(self, event: ChallengeCanceledEvent) -> None:
         self.last_event_time = time.monotonic()
-        challenge_id = event["challenge"]["id"]
+        challenge_id = event.challenge.id
         logger.info("%s -- Challenge canceled.", challenge_id)
         if challenge_id in self.challenge_queue:
             self.challenge_queue.remove(challenge_id)
@@ -163,7 +163,7 @@ class GameManager:
         )
 
     @staticmethod
-    def check_decline_reason(event: dict) -> DeclineReason | None:
+    def check_decline_reason(event: ChallengeEvent) -> DeclineReason | None:
         challenge_config = CONFIG["challenge"]
         if not challenge_config["enabled"]:
             return DeclineReason.GENERIC
@@ -179,33 +179,28 @@ class GameManager:
         max_bot_rating_diff = challenge_config["max_rating_diffs"].get("bot", 4000)
         max_human_rating_diff = challenge_config["max_rating_diffs"].get("human", 4000)
 
-        challenge_info = event["challenge"]
-        is_rated = challenge_info["rated"]
-        if is_rated and "rated" not in allowed_modes:
+        challenge = event.challenge
+        if challenge.rated and "rated" not in allowed_modes:
             return DeclineReason.CASUAL
 
-        if not is_rated and "casual" not in allowed_modes:
+        if not challenge.rated and "casual" not in allowed_modes:
             return DeclineReason.RATED
 
-        variant = challenge_info["variant"]["key"]
-        if variant not in allowed_variants:
+        if challenge.variant.key not in allowed_variants:
             return (
                 DeclineReason.STANDARD
                 if allowed_variants == [Variant.STANDARD]
                 else DeclineReason.VARIANT
             )
 
-        if challenger_info := challenge_info["challenger"]:
-            is_bot = challenger_info.get("title") == "BOT"
-            their_rating = challenger_info.get("rating")
+        if challenger := challenge.challenger:
+            is_bot = challenger.title == "BOT"
+            their_rating = challenger.rating
         else:
             is_bot = False
             their_rating = None
 
-        if my_info := challenge_info["destUser"]:
-            my_rating = my_info.get("rating")
-        else:
-            my_rating = None
+        my_rating = challenge.dest_user.rating if challenge.dest_user else None
 
         if is_bot and "bot" not in allowed_opponents:
             return DeclineReason.NO_BOT
@@ -213,19 +208,18 @@ class GameManager:
         if not is_bot and "human" not in allowed_opponents:
             return DeclineReason.ONLY_BOT
 
-        increment = challenge_info["timeControl"].get("increment", 0)
-        initial = challenge_info["timeControl"].get("limit", 0)
-        speed = challenge_info["speed"]
-        if speed not in allowed_tcs:
+        if challenge.speed not in allowed_tcs:
             return DeclineReason.TIME_CONTROL
 
+        initial = challenge.time_control.limit
+        increment = challenge.time_control.increment
         if initial < min_initial or increment < min_increment:
             return DeclineReason.TOO_FAST
 
         if initial > max_initial or increment > max_increment:
             return DeclineReason.TOO_SLOW
 
-        if is_rated and my_rating is not None and their_rating is not None:
+        if challenge.rated and my_rating is not None and their_rating is not None:
             rating_diff = abs(my_rating - their_rating)
             max_rating_diff = max_bot_rating_diff if is_bot else max_human_rating_diff
             if rating_diff > max_rating_diff:

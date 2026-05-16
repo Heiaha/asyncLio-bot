@@ -8,23 +8,24 @@ import chess.polyglot
 import chess.variant
 
 from config import CONFIG
-from enums import GameStatus, GameEvent, Variant, BookSelection
+from enums import GameStatus, Variant, BookSelection
 from lichess import Lichess
+from models import GameFull, GameStartEvent, GamePing, GameState, OpponentGone
 
 logger = logging.getLogger(__name__)
 
 
 class Game:
-    def __init__(self, li: Lichess, event: dict) -> None:
+    def __init__(self, li: Lichess, event: GameStartEvent) -> None:
         self.li: Lichess = li
-        self.id: str = event["game"]["gameId"]
+        self.id: str = event.game.id
         self.color: chess.Color = (
-            chess.WHITE if event["game"]["color"] == "white" else chess.BLACK
+            chess.WHITE if event.game.color == "white" else chess.BLACK
         )
-        self.opponent: str = event["game"]["opponent"]["username"]
-        self.initial_fen: str = event["game"]["fen"]
-        self.variant: Variant = Variant(event["game"]["variant"]["key"])
-        self.status: GameStatus = GameStatus(event["game"]["status"]["name"])
+        self.opponent: str = event.game.opponent.username
+        self.initial_fen: str = event.game.fen
+        self.variant: Variant = event.game.variant.key
+        self.status: GameStatus = event.game.status.name
         self.scores: list[chess.engine.PovScore] = []
         self.board: chess.Board = self.make_board()
         self.ponder_move: chess.Move | None = None
@@ -66,17 +67,17 @@ class Game:
             await engine.configure(options)
         self.engine = engine
 
-    def update(self, event: dict) -> bool:
-        self.status = GameStatus(event["status"])
+    def update(self, state: GameState) -> bool:
+        self.status = state.status
 
         self.clock = {
-            "white_clock": event["wtime"] / 1000,
-            "black_clock": event["btime"] / 1000,
-            "white_inc": event["winc"] / 1000,
-            "black_inc": event["binc"] / 1000,
+            "white_clock": state.wtime / 1000,
+            "black_clock": state.btime / 1000,
+            "white_inc": state.winc / 1000,
+            "black_inc": state.binc / 1000,
         }
 
-        moves = event["moves"].split()
+        moves = state.moves.split()
         if len(moves) <= len(self.board.move_stack):
             return False
 
@@ -147,8 +148,8 @@ class Game:
             pv=" ".join(m.uci() for m in pv) if (pv := info.get("pv")) else None,
         )
 
-    def format_result_message(self, event: dict) -> str:
-        if wb_winner := event.get("winner"):
+    def format_result_message(self, state: GameState) -> str:
+        if wb_winner := state.winner:
             white_name, black_name = self.player_names
             winning_name, losing_name = (
                 (white_name, black_name)
@@ -308,23 +309,21 @@ class Game:
         move_tasks = []
         await self.start_engine()
         async for event in self.li.game_stream(self.id):
-            event_type = GameEvent(event["type"])
             should_make_move = False
 
-            if event_type == GameEvent.GAME_FULL:
-                self.update(event["state"])
-                should_make_move = self.is_our_turn
+            match event:
+                case GameFull():
+                    self.update(event.state)
+                    should_make_move = self.is_our_turn
 
-            elif event_type == GameEvent.GAME_STATE:
-                should_make_move = self.update(event) and self.is_our_turn
+                case GameState():
+                    should_make_move = self.update(event) and self.is_our_turn
 
-            elif event_type == GameEvent.OPPONENT_GONE:
-                if event.get("claimWinInSeconds") == 0 and not self.is_our_turn:
+                case OpponentGone() if event.claim_win_in_seconds == 0 and not self.is_our_turn:
                     logger.info("%s -- Attempting to claim victory", self.id)
                     await self.li.claim_victory(self.id)
 
-            elif event_type == GameEvent.PING:
-                if (
+                case GamePing() if (
                     len(self.board.move_stack) < 2
                     and not self.is_our_turn
                     and time.monotonic() - start_time >= CONFIG["abort_time"]
@@ -332,7 +331,8 @@ class Game:
                     await self.li.abort_game(self.id)
 
             if self.is_game_over:
-                logger.info(self.format_result_message(event.get("state", event)))
+                state = event.state if isinstance(event, GameFull) else event
+                logger.info(self.format_result_message(state))
                 break
 
             if should_make_move:

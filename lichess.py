@@ -10,6 +10,14 @@ import httpx
 
 from config import CONFIG
 from enums import DeclineReason
+from models import (
+    Account,
+    GameStreamEvent,
+    OnlineBot,
+    StreamEvent,
+    parse_event,
+    parse_game_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +29,13 @@ class Lichess:
         headers = {
             "Authorization": f"Bearer {CONFIG['token']}",
         }
-        user_info = httpx.get("https://lichess.org/api/account", headers=headers).json()
-        headers["User-Agent"] = f"asyncLio-bot user:{user_info['username']}"
+        account = Account.model_validate(
+            httpx.get("https://lichess.org/api/account", headers=headers).json()
+        )
+        headers["User-Agent"] = f"asyncLio-bot user:{account.username}"
 
-        self.username: str = user_info["username"]
-        self.title: str = user_info.get("title", "")
+        self.username: str = account.username
+        self.title: str = account.title
         self.client: httpx.AsyncClient = httpx.AsyncClient(
             base_url="https://lichess.org",
             headers=headers,
@@ -100,18 +110,19 @@ class Lichess:
             await asyncio.sleep(2**attempt + random.random())
             attempt += 1
 
-    async def event_stream(self) -> AsyncIterator[dict]:
+    async def event_stream(self) -> AsyncIterator[StreamEvent]:
         while True:  # in case the event stream expires
             async for event in self.stream("/api/stream/event"):
-                yield event
+                yield parse_event(event)
 
-    async def game_stream(self, game_id: str) -> AsyncIterator[dict]:
+    async def game_stream(self, game_id: str) -> AsyncIterator[GameStreamEvent]:
         async for event in self.stream(f"/api/bot/game/stream/{game_id}"):
-            yield event
+            yield parse_game_event(event)
 
-    async def get_online_bots(self) -> AsyncIterator[dict]:
-        async for event in self.stream("/api/bot/online"):
-            yield event
+    async def get_online_bots(self) -> AsyncIterator[OnlineBot]:
+        async for info in self.stream("/api/bot/online"):
+            if "username" in info:
+                yield OnlineBot.model_validate(info)
 
     async def accept_challenge(self, challenge_id: str) -> None:
         await self.post(f"/api/challenge/{challenge_id}/accept")
