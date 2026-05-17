@@ -5,7 +5,7 @@ from collections import deque
 from typing import NoReturn
 
 from config import CONFIG
-from enums import DeclineReason, Event, Variant
+from enums import ChallengeMode, ChallengeOpponent, DeclineReason, Event, Variant
 from game import Game
 from lichess import Lichess
 from matchmaker import Matchmaker
@@ -169,10 +169,10 @@ class GameManager:
             return DeclineReason.GENERIC
 
         challenge = event.challenge
-        if challenge.rated and "rated" not in cfg.modes:
+        if challenge.rated and ChallengeMode.RATED not in cfg.modes:
             return DeclineReason.CASUAL
 
-        if not challenge.rated and "casual" not in cfg.modes:
+        if not challenge.rated and ChallengeMode.CASUAL not in cfg.modes:
             return DeclineReason.RATED
 
         if challenge.variant not in cfg.variants:
@@ -191,10 +191,10 @@ class GameManager:
 
         my_rating = challenge.dest_user.rating if challenge.dest_user else None
 
-        if is_bot and "bot" not in cfg.opponents:
+        if is_bot and ChallengeOpponent.BOT not in cfg.opponents:
             return DeclineReason.NO_BOT
 
-        if not is_bot and "human" not in cfg.opponents:
+        if not is_bot and ChallengeOpponent.HUMAN not in cfg.opponents:
             return DeclineReason.ONLY_BOT
 
         if challenge.speed not in cfg.time_controls:

@@ -1,8 +1,8 @@
-from typing import Union
+from typing import Literal, Union
 
 from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
 
-from enums import Event, GameEvent, GameStatus, Variant
+from enums import Event, GameEvent, GameStatus, Speed, Variant
 
 
 class LichessModel(BaseModel):
@@ -23,7 +23,7 @@ class TimeControl(LichessModel):
 # Event stream (/api/stream/event)
 class GameEventInfo(LichessModel):
     id: str = Field(validation_alias=AliasChoices("id", "gameId"))
-    color: str
+    color: Literal["white", "black"]
     fen: str
     variant: Variant = Field(validation_alias=AliasPath("variant", "key"))
     status: GameStatus = Field(validation_alias=AliasPath("status", "name"))
@@ -49,7 +49,7 @@ class ChallengePlayer(LichessModel):
 class ChallengeInfo(LichessModel):
     id: str
     rated: bool
-    speed: str
+    speed: Speed
     variant: Variant = Field(validation_alias=AliasPath("variant", "key"))
     challenger: ChallengePlayer | None = None
     dest_user: ChallengePlayer | None = Field(default=None, alias="destUser")

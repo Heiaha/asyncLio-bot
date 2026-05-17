@@ -50,7 +50,7 @@ class Lichess:
 
     @property
     def me(self):
-        return f"{self.title} {self.username}"
+        return f"{self.title} {self.username}".strip()
 
     @staticmethod
     def is_fatal_client_error(response: httpx.Response) -> bool:

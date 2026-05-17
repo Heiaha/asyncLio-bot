@@ -98,6 +98,30 @@ class PerfType(StrEnum):
         return cls(variant)
 
 
+class ChallengeMode(StrEnum):
+    RATED = "rated"
+    CASUAL = "casual"
+
+
+class ChallengeOpponent(StrEnum):
+    BOT = "bot"
+    HUMAN = "human"
+
+
+class Speed(StrEnum):
+    ULTRA_BULLET = "ultraBullet"
+    BULLET = "bullet"
+    BLITZ = "blitz"
+    RAPID = "rapid"
+    CLASSICAL = "classical"
+    CORRESPONDENCE = "correspondence"
+    UNKNOWN = "unknown"
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls.UNKNOWN
+
+
 class BookSelection(StrEnum):
     WEIGHTED_RANDOM = "weighted_random"
     UNIFORM_RANDOM = "uniform_random"

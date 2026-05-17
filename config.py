@@ -4,7 +4,7 @@ import os
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
-from enums import BookSelection, Variant
+from enums import BookSelection, ChallengeMode, ChallengeOpponent, Speed, Variant
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +53,9 @@ class ChallengeConfig(BaseModel):
     max_initial: int = 315360000
     min_initial: int = 0
     variants: list[Variant] = Field(default_factory=list)
-    time_controls: list[str] = Field(default_factory=list)
-    modes: list[str] = Field(default_factory=list)
-    opponents: list[str] = Field(default_factory=list)
+    time_controls: list[Speed] = Field(default_factory=list)
+    modes: list[ChallengeMode] = Field(default_factory=list)
+    opponents: list[ChallengeOpponent] = Field(default_factory=list)
     max_rating_diffs: RatingDiffs = Field(default_factory=RatingDiffs)
 
 
