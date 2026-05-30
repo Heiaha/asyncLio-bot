@@ -83,3 +83,10 @@ matchmaking:
   min_games: 50               # Minimum games opponent must have played in the chosen variant (including sub-division of standard into bullet, blitz etc.)
   timeout: 5                  # Timeout (in minutes) between nothing happening and issuing a challenge.
   rated: false                # Whether to challenge rated or casual.
+
+blocklist:                    # Optional. These users are never challenged, and their incoming challenges are declined.
+  users:                      # Explicit usernames to block (case-insensitive).
+#    - SomeBot
+  urls:                       # Newline-separated username lists fetched at startup and merged in.
+#    - https://raw.githubusercontent.com/xu-shawn/lichess-bots-blocklist/main/blocklist
+  refresh: 60                # Minutes between re-fetching the URL lists. 0 = load once at startup.

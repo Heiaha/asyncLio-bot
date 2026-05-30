@@ -83,6 +83,12 @@ class MatchmakingConfig(BaseModel):
     rated: bool = False
 
 
+class BlocklistConfig(BaseModel):
+    users: list[str] = Field(default_factory=list)
+    urls: list[str] = Field(default_factory=list)
+    refresh: int = 0
+
+
 class Config(BaseModel):
     token: str
     concurrency: int = 1
@@ -94,6 +100,7 @@ class Config(BaseModel):
     draw: DrawConfig = Field(default_factory=DrawConfig)
     resign: ResignConfig = Field(default_factory=ResignConfig)
     matchmaking: MatchmakingConfig = Field(default_factory=MatchmakingConfig)
+    blocklist: BlocklistConfig = Field(default_factory=BlocklistConfig)
 
 
 # Stable singleton — mutated in place by load_config so `from config import CONFIG`

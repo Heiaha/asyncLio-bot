@@ -51,11 +51,13 @@ class Matchmaker:
     def __init__(self, li: Lichess) -> None:
         self.li: Lichess = li
 
-    async def challenge(self) -> None:
+    async def challenge(self, blocklist: set[str]) -> None:
         bots = [
             Bot(info)
             async for info in self.li.get_online_bots()
-            if not info.disabled and not info.tos_violation
+            if not info.disabled
+            and not info.tos_violation
+            and info.username.lower() not in blocklist
         ]
         
         try:

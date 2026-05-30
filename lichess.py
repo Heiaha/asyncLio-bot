@@ -55,6 +55,26 @@ class Lichess:
     def me(self):
         return f"{self.title} {self.username}".strip()
 
+    async def fetch_blocklist(self) -> set[str]:
+        users = {user.lower() for user in CONFIG.blocklist.users}
+        if not CONFIG.blocklist.urls:
+            return users
+        # Separate client: don't send the Lichess auth token to third-party URLs.
+        async with httpx.AsyncClient(timeout=10) as client:
+            for url in CONFIG.blocklist.urls:
+                try:
+                    response = await client.get(url)
+                    response.raise_for_status()
+                except httpx.HTTPError as e:
+                    logger.warning("Could not fetch blocklist from %s: %s", url, e)
+                    continue
+                users.update(
+                    name
+                    for line in response.text.splitlines()
+                    if (name := line.strip().lower()) and not name.startswith("#")
+                )
+        return users
+
     @staticmethod
     def is_fatal_client_error(response: httpx.Response) -> bool:
         # 429 is retried after a longer sleep; other 4xxs mean the request

@@ -26,8 +26,18 @@ class GameManager:
         self.current_games: dict[str, Game] = {}
         self.challenge_queue: deque[str] = deque()
         self.last_event_time: float = time.monotonic()
+        self.blocklist: set[str] = set()
+        self.last_blocklist_refresh: float = 0.0
+
+    def is_blocked(self, username: str) -> bool:
+        return username.lower() in self.blocklist
 
     async def watch_event_stream(self) -> NoReturn:
+        self.blocklist = await self.li.fetch_blocklist()
+        self.last_blocklist_refresh = time.monotonic()
+        if self.blocklist:
+            logger.info("Blocklist contains %d users", len(self.blocklist))
+
         async for event in self.li.event_stream():
             match event.type:
                 case Event.PING:
@@ -52,13 +62,18 @@ class GameManager:
 
         logger.debug("Active tasks: %d", len(asyncio.all_tasks()))
 
+        if self.should_refresh_blocklist():
+            self.last_blocklist_refresh = time.monotonic()
+            self.blocklist = await self.li.fetch_blocklist()
+            logger.debug("Refreshed blocklist: %d users", len(self.blocklist))
+
         if self.is_under_concurrency_limit() and self.challenge_queue:
             await self.li.accept_challenge(self.challenge_queue.popleft())
             return
 
         if self.should_create_challenge():
             self.last_event_time = time.monotonic()
-            await self.matchmaker.challenge()
+            await self.matchmaker.challenge(self.blocklist)
 
     async def on_game_start(self, event: GameStartEvent) -> None:
         self.last_event_time = time.monotonic()
@@ -113,6 +128,15 @@ class GameManager:
         if challenger_name == self.li.username:
             return
 
+        if self.is_blocked(challenger_name):
+            logger.info(
+                "%s -- Declining challenge from blocked user %s",
+                challenge.id,
+                challenger_name,
+            )
+            await self.li.decline_challenge(challenge.id, reason=DeclineReason.GENERIC)
+            return
+
         logger.info("%s -- Challenger: %s", challenge.id, challenger_name)
         if decline_reason := self.check_decline_reason(event):
             logger.info(
@@ -149,6 +173,15 @@ class GameManager:
 
     def is_under_concurrency_limit(self) -> bool:
         return len(self.current_games) < CONFIG.concurrency
+
+    def should_refresh_blocklist(self) -> bool:
+        if CONFIG.blocklist.refresh <= 0:
+            return False
+
+        return (
+            time.monotonic() - self.last_blocklist_refresh
+            >= CONFIG.blocklist.refresh * 60
+        )
 
     def should_create_challenge(self) -> bool:
         if not CONFIG.matchmaking.enabled:
