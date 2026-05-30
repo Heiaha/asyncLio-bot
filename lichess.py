@@ -223,3 +223,4 @@ class Lichess:
             seconds := self.rate_limit_seconds(response)
         ) is not None:
             self.challenge_timeout = time.monotonic() + seconds
+            logger.info("Rate limited; pausing matchmaking for %.0fs", seconds)
