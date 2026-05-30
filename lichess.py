@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class Lichess:
-    ATTEMPTS = 10
+    ATTEMPTS = 5
 
     async def __aenter__(self):
         headers = {
