@@ -154,6 +154,9 @@ class GameManager:
         if not CONFIG.matchmaking.enabled:
             return False
 
+        if time.monotonic() < self.li.challenge_timeout:
+            return False
+
         if len(self.current_games) > 0:
             return False
 

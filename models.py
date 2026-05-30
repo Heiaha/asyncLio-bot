@@ -15,6 +15,13 @@ class Account(LichessModel):
     title: str = ""
 
 
+# 429 rate-limit error body (e.g. the bot.vsBot.day daily cap)
+class RateLimit(LichessModel):
+    seconds: float | None = Field(
+        default=None, validation_alias=AliasPath("ratelimit", "seconds")
+    )
+
+
 class TimeControl(LichessModel):
     limit: int = 0
     increment: int = 0

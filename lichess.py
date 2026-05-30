@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import random
+import time
 from typing import AsyncIterator
 
 import chess
@@ -15,6 +16,7 @@ from models import (
     GameStreamEvent,
     OnlineBot,
     PingEvent,
+    RateLimit,
     StreamEvent,
     parse_event,
     parse_game_event,
@@ -42,6 +44,7 @@ class Lichess:
             headers=headers,
             timeout=60,
         )
+        self.challenge_timeout: float = 0.0
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -71,12 +74,24 @@ class Lichess:
         )
 
     @staticmethod
+    def rate_limit_seconds(response: httpx.Response) -> float | None:
+        # A 429 carrying {"ratelimit": {"seconds": N}} means a quota is spent (e.g. the
+        # 100/day bot-vs-bot cap). Return N so we can wait it out; None otherwise.
+        if response.status_code != httpx.codes.TOO_MANY_REQUESTS:
+            return None
+        if "json" not in response.headers.get("content-type", ""):
+            return None
+        return RateLimit.model_validate_json(response.content).seconds
+
+    @staticmethod
     async def backoff(response: httpx.Response | None, attempt: int) -> None:
         if response is not None and response.status_code == httpx.codes.TOO_MANY_REQUESTS:
             await asyncio.sleep(60)
         await asyncio.sleep(2**attempt + random.random())
 
-    async def post(self, endpoint: str, retry: bool = True, **kwargs) -> None:
+    async def post(
+        self, endpoint: str, retry: bool = True, **kwargs
+    ) -> httpx.Response | None:
         for attempt in range(self.ATTEMPTS):
             response = None
             try:
@@ -85,20 +100,21 @@ class Lichess:
                 logger.warning("Connection error on %s", endpoint)
             except Exception as e:
                 logger.exception("Error %s on %s", e, endpoint)
-                return
+                return None
             else:
                 if response.is_success:
-                    return
+                    return response
                 if self.is_fatal_client_error(response):
                     self.log_client_error(response, endpoint)
-                    return
+                    return response
 
             if not retry:
-                return
+                return response
 
             await self.backoff(response, attempt)
 
         logger.warning("Giving up requests on %s", endpoint)
+        return response
 
     async def iter_lines(self, endpoint: str) -> AsyncIterator[str]:
         """Stream raw lines from `endpoint`, reconnecting on transient errors.
@@ -115,8 +131,12 @@ class Lichess:
                         async for line in response.aiter_lines():
                             yield line
                         return
-            except Exception as e:
-                logger.exception("Error %s on event stream %s", e, endpoint)
+            except httpx.RequestError as e:
+                logger.warning(
+                    "Event stream %s disconnected (%s); reconnecting", endpoint, e
+                )
+            except Exception:
+                logger.exception("Unexpected error on event stream %s", endpoint)
             else:
                 if self.is_fatal_client_error(response):
                     self.log_client_error(response, endpoint)
@@ -188,7 +208,7 @@ class Lichess:
     async def create_challenge(
         self, opponent: str, initial_time: int, increment: int = 0
     ) -> None:
-        await self.post(
+        response = await self.post(
             f"/api/challenge/{opponent}",
             data={
                 "rated": str(CONFIG.matchmaking.rated).lower(),
@@ -199,3 +219,7 @@ class Lichess:
             },
             retry=False,
         )
+        if response is not None and (
+            seconds := self.rate_limit_seconds(response)
+        ) is not None:
+            self.challenge_timeout = time.monotonic() + seconds
