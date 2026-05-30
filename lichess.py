@@ -76,7 +76,7 @@ class Lichess:
             await asyncio.sleep(60)
         await asyncio.sleep(2**attempt + random.random())
 
-    async def post(self, endpoint: str, **kwargs) -> None:
+    async def post(self, endpoint: str, retry: bool = True, **kwargs) -> None:
         for attempt in range(self.ATTEMPTS):
             response = None
             try:
@@ -92,6 +92,9 @@ class Lichess:
                 if self.is_fatal_client_error(response):
                     self.log_client_error(response, endpoint)
                     return
+
+            if not retry:
+                return
 
             await self.backoff(response, attempt)
 
@@ -194,4 +197,5 @@ class Lichess:
                 "variant": CONFIG.matchmaking.variant.value,
                 "color": "random",
             },
+            retry=False,
         )
