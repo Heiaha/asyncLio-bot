@@ -69,9 +69,9 @@ class Lichess:
                     logger.warning("Could not fetch blocklist from %s: %s", url, e)
                     continue
                 users.update(
-                    name
+                    line.strip().lower()
                     for line in response.text.splitlines()
-                    if (name := line.strip().lower()) and not name.startswith("#")
+                    if not line.startswith("#")
                 )
         return users
 
