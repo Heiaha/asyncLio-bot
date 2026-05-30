@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import get_origin
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
@@ -9,13 +10,33 @@ from enums import BookSelection, ChallengeMode, ChallengeOpponent, Speed, Varian
 logger = logging.getLogger(__name__)
 
 
-class EngineConfig(BaseModel):
+class ConfigModel(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def empty_when_null(cls, data):
+        # A YAML key written with all of its entries commented out (e.g. `users:`)
+        # parses to None instead of being absent, so default_factory never fires.
+        # Treat a null list/dict field as empty so commenting everything out under a
+        # key doesn't crash config loading.
+        if not isinstance(data, dict):
+            return data
+        for name, field in cls.model_fields.items():
+            if data.get(name) is None and name in data:
+                origin = get_origin(field.annotation)
+                if origin is list:
+                    data[name] = []
+                elif origin is dict:
+                    data[name] = {}
+        return data
+
+
+class EngineConfig(ConfigModel):
     path: str
     ponder: bool = False
     uci_options: dict[str, int | str | bool] = Field(default_factory=dict)
 
 
-class BooksConfig(BaseModel):
+class BooksConfig(ConfigModel):
     enabled: bool = False
     selection: BookSelection = BookSelection.WEIGHTED_RANDOM
     depth: int = 10
@@ -41,12 +62,12 @@ class BooksConfig(BaseModel):
         return self.by_variant.get(variant.value, [])
 
 
-class RatingDiffs(BaseModel):
+class RatingDiffs(ConfigModel):
     human: int = 4000
     bot: int = 4000
 
 
-class ChallengeConfig(BaseModel):
+class ChallengeConfig(ConfigModel):
     enabled: bool = False
     max_increment: int = 180
     min_increment: int = 0
@@ -59,20 +80,20 @@ class ChallengeConfig(BaseModel):
     max_rating_diffs: RatingDiffs = Field(default_factory=RatingDiffs)
 
 
-class DrawConfig(BaseModel):
+class DrawConfig(ConfigModel):
     enabled: bool = False
     score: int = 0
     moves: int = 5
     min_game_length: int = 35
 
 
-class ResignConfig(BaseModel):
+class ResignConfig(ConfigModel):
     enabled: bool = False
     score: int = -1000
     moves: int = 5
 
 
-class MatchmakingConfig(BaseModel):
+class MatchmakingConfig(ConfigModel):
     enabled: bool = False
     variant: Variant = Variant.STANDARD
     initial_times: list[int] = Field(default_factory=list)
@@ -83,13 +104,13 @@ class MatchmakingConfig(BaseModel):
     rated: bool = False
 
 
-class BlocklistConfig(BaseModel):
+class BlocklistConfig(ConfigModel):
     users: list[str] = Field(default_factory=list)
     urls: list[str] = Field(default_factory=list)
     refresh: int = 0
 
 
-class Config(BaseModel):
+class Config(ConfigModel):
     token: str
     concurrency: int = 1
     abort_time: int = 20
