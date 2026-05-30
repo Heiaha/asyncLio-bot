@@ -29,9 +29,6 @@ class GameManager:
         self.blocklist: set[str] = set()
         self.last_blocklist_refresh: float = 0.0
 
-    def is_blocked(self, username: str) -> bool:
-        return username.lower() in self.blocklist
-
     async def watch_event_stream(self) -> NoReturn:
         self.blocklist = await self.li.fetch_blocklist()
         self.last_blocklist_refresh = time.monotonic()
@@ -128,7 +125,7 @@ class GameManager:
         if challenger_name == self.li.username:
             return
 
-        if self.is_blocked(challenger_name):
+        if challenger_name.lower() in self.blocklist:
             logger.info(
                 "%s -- Declining challenge from blocked user %s",
                 challenge.id,
