@@ -123,15 +123,14 @@ class Lichess:
         for attempt in range(self.ATTEMPTS):
             response = None
             try:
-                async with self.client.post(endpoint, **kwargs) as resp:
-                    await resp.read()
+                async with self.client.post(endpoint, **kwargs) as response:
+                    await response.read()
             except (aiohttp.ClientError, asyncio.TimeoutError):
                 logger.warning("Connection error on %s", endpoint)
             except Exception as e:
                 logger.exception("Error %s on %s", e, endpoint)
                 return None
             else:
-                response = resp
                 if response.ok:
                     return response
                 if self.is_fatal_client_error(response):
