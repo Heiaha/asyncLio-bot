@@ -3,7 +3,6 @@ import argparse
 import asyncio
 import logging
 
-import httpx
 from dotenv import load_dotenv
 
 import config
@@ -35,7 +34,7 @@ async def main(args: argparse.Namespace):
         handlers=logging_handlers,
     )
 
-    logging.getLogger(httpx.__name__).setLevel(
+    logging.getLogger("aiohttp.client").setLevel(
         logging.DEBUG if args.verbose else logging.WARNING
     )
 

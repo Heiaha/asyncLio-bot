@@ -3,10 +3,11 @@ import json
 import logging
 import random
 import time
+from http import HTTPStatus
 from typing import AsyncIterator
 
+import aiohttp
 import chess
-import httpx
 
 from config import CONFIG
 from enums import DeclineReason
@@ -32,23 +33,26 @@ class Lichess:
         headers = {
             "Authorization": f"Bearer {CONFIG.token}",
         }
-        account = Account.model_validate_json(
-            httpx.get("https://lichess.org/api/account", headers=headers).content
-        )
+        async with aiohttp.ClientSession(
+            headers=headers, cookie_jar=aiohttp.DummyCookieJar()
+        ) as session:
+            async with session.get("https://lichess.org/api/account") as response:
+                account = Account.model_validate_json(await response.read())
         headers["User-Agent"] = f"asyncLio-bot user:{account.username}"
 
         self.username: str = account.username
         self.title: str = account.title
-        self.client: httpx.AsyncClient = httpx.AsyncClient(
+        self.client: aiohttp.ClientSession = aiohttp.ClientSession(
             base_url="https://lichess.org",
             headers=headers,
-            timeout=60,
+            timeout=aiohttp.ClientTimeout(total=None, sock_connect=60, sock_read=60),
+            cookie_jar=aiohttp.DummyCookieJar(),
         )
         self.challenge_timeout: float = 0.0
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.client.aclose()
+        await self.client.close()
         logger.debug("Client closed")
 
     @property
@@ -60,69 +64,75 @@ class Lichess:
         if not CONFIG.blocklist.urls:
             return users
         # Separate client: don't send the Lichess auth token to third-party URLs.
-        async with httpx.AsyncClient(timeout=10) as client:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(
+            timeout=timeout, cookie_jar=aiohttp.DummyCookieJar()
+        ) as client:
             for url in CONFIG.blocklist.urls:
                 try:
-                    response = await client.get(url)
-                    response.raise_for_status()
-                except httpx.HTTPError as e:
+                    async with client.get(url) as response:
+                        response.raise_for_status()
+                        text = await response.text()
+                except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                     logger.warning("Could not fetch blocklist from %s: %s", url, e)
                     continue
                 users.update(
                     line.strip().lower()
-                    for line in response.text.splitlines()
+                    for line in text.splitlines()
                     if not line.startswith("#")
                 )
         return users
 
     @staticmethod
-    def is_fatal_client_error(response: httpx.Response) -> bool:
+    def is_fatal_client_error(response: aiohttp.ClientResponse) -> bool:
         # 429 is retried after a longer sleep; other 4xxs mean the request
         # itself is wrong and retrying won't help.
         return (
-            response.is_client_error
-            and response.status_code != httpx.codes.TOO_MANY_REQUESTS
+            400 <= response.status < 500
+            and response.status != HTTPStatus.TOO_MANY_REQUESTS
         )
 
     @staticmethod
-    def log_client_error(response: httpx.Response, endpoint: str) -> None:
+    def log_client_error(response: aiohttp.ClientResponse, endpoint: str) -> None:
         logger.warning(
             "Error %d (%s) on %s.",
-            response.status_code,
-            httpx.codes.get_reason_phrase(response.status_code),
+            response.status,
+            response.reason,
             endpoint,
         )
 
     @staticmethod
-    def rate_limit_seconds(response: httpx.Response) -> float | None:
+    async def rate_limit_seconds(response: aiohttp.ClientResponse) -> float | None:
         # A 429 carrying {"ratelimit": {"seconds": N}} means a quota is spent (e.g. the
         # 100/day bot-vs-bot cap). Return N so we can wait it out; None otherwise.
-        if response.status_code != httpx.codes.TOO_MANY_REQUESTS:
+        if response.status != HTTPStatus.TOO_MANY_REQUESTS:
             return None
         if "json" not in response.headers.get("content-type", ""):
             return None
-        return RateLimit.model_validate_json(response.content).seconds
+        return RateLimit.model_validate_json(await response.read()).seconds
 
     @staticmethod
-    async def backoff(response: httpx.Response | None, attempt: int) -> None:
-        if response is not None and response.status_code == httpx.codes.TOO_MANY_REQUESTS:
+    async def backoff(response: aiohttp.ClientResponse | None, attempt: int) -> None:
+        if response is not None and response.status == HTTPStatus.TOO_MANY_REQUESTS:
             await asyncio.sleep(60)
         await asyncio.sleep(2**attempt + random.random())
 
     async def post(
         self, endpoint: str, retry: bool = True, **kwargs
-    ) -> httpx.Response | None:
+    ) -> aiohttp.ClientResponse | None:
         for attempt in range(self.ATTEMPTS):
             response = None
             try:
-                response = await self.client.post(endpoint, **kwargs)
-            except httpx.RequestError:
+                async with self.client.post(endpoint, **kwargs) as resp:
+                    await resp.read()
+            except (aiohttp.ClientError, asyncio.TimeoutError):
                 logger.warning("Connection error on %s", endpoint)
             except Exception as e:
                 logger.exception("Error %s on %s", e, endpoint)
                 return None
             else:
-                if response.is_success:
+                response = resp
+                if response.ok:
                     return response
                 if self.is_fatal_client_error(response):
                     self.log_client_error(response, endpoint)
@@ -146,12 +156,12 @@ class Lichess:
         while True:
             response = None
             try:
-                async with self.client.stream("GET", endpoint) as response:
-                    if response.is_success:
-                        async for line in response.aiter_lines():
-                            yield line
+                async with self.client.get(endpoint) as response:
+                    if response.ok:
+                        async for line in response.content:
+                            yield line.decode()
                         return
-            except httpx.RequestError as e:
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 logger.warning(
                     "Event stream %s disconnected (%s); reconnecting", endpoint, e
                 )
@@ -232,15 +242,15 @@ class Lichess:
             f"/api/challenge/{opponent}",
             data={
                 "rated": str(CONFIG.matchmaking.rated).lower(),
-                "clock.limit": initial_time,
-                "clock.increment": increment,
-                "variant": CONFIG.matchmaking.variant.value,
+                "clock.limit": str(initial_time),
+                "clock.increment": str(increment),
+                "variant": CONFIG.matchmaking.variant,
                 "color": "random",
             },
             retry=False,
         )
         if response is not None and (
-            seconds := self.rate_limit_seconds(response)
+            seconds := await self.rate_limit_seconds(response)
         ) is not None:
             self.challenge_timeout = time.monotonic() + seconds
             logger.info("Rate limited; pausing matchmaking for %.0fs", seconds)
