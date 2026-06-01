@@ -102,14 +102,10 @@ class Lichess:
         )
 
     @staticmethod
-    async def rate_limit_seconds(response: aiohttp.ClientResponse) -> float | None:
-        # A 429 carrying {"ratelimit": {"seconds": N}} means a quota is spent (e.g. the
-        # 100/day bot-vs-bot cap). Return N so we can wait it out; None otherwise.
-        if response.status != HTTPStatus.TOO_MANY_REQUESTS:
-            return None
-        if "json" not in response.headers.get("content-type", ""):
-            return None
-        return RateLimit.model_validate_json(await response.read()).seconds
+    def rate_limit_seconds(body: dict | None) -> float | None:
+        # A spent quota (e.g. the 100/day bot-vs-bot cap) comes back as
+        # {"ratelimit": {"seconds": N}}; other responses have no such field.
+        return RateLimit.model_validate(body).seconds if body else None
 
     @staticmethod
     async def backoff(response: aiohttp.ClientResponse | None, attempt: int) -> None:
@@ -119,31 +115,34 @@ class Lichess:
 
     async def post(
         self, endpoint: str, retry: bool = True, **kwargs
-    ) -> aiohttp.ClientResponse | None:
+    ) -> dict | None:
+        """POST to `endpoint`, retrying transient failures.
+
+        Returns the parsed JSON response body, or None if no JSON response was
+        obtained (connection error, non-JSON body, or retries exhausted).
+        """
         for attempt in range(self.ATTEMPTS):
-            response = None
             try:
                 async with self.client.post(endpoint, **kwargs) as response:
-                    await response.read()
+                    body = await response.json()
+                    if response.ok:
+                        return body
+                    if self.is_fatal_client_error(response):
+                        self.log_client_error(response, endpoint)
+                        return body
+                    if not retry:
+                        return body
             except (aiohttp.ClientError, asyncio.TimeoutError):
                 logger.warning("Connection error on %s", endpoint)
+                await self.backoff(None, attempt)
             except Exception as e:
                 logger.exception("Error %s on %s", e, endpoint)
                 return None
             else:
-                if response.ok:
-                    return response
-                if self.is_fatal_client_error(response):
-                    self.log_client_error(response, endpoint)
-                    return response
-
-            if not retry:
-                return response
-
-            await self.backoff(response, attempt)
+                await self.backoff(response, attempt)
 
         logger.warning("Giving up requests on %s", endpoint)
-        return response
+        return None
 
     async def iter_lines(self, endpoint: str) -> AsyncIterator[str]:
         """Stream raw lines from `endpoint`, reconnecting on transient errors.
@@ -237,7 +236,7 @@ class Lichess:
     async def create_challenge(
         self, opponent: str, initial_time: int, increment: int = 0
     ) -> None:
-        response = await self.post(
+        body = await self.post(
             f"/api/challenge/{opponent}",
             data={
                 "rated": str(CONFIG.matchmaking.rated).lower(),
@@ -248,8 +247,6 @@ class Lichess:
             },
             retry=False,
         )
-        if response is not None and (
-            seconds := await self.rate_limit_seconds(response)
-        ) is not None:
+        if (seconds := self.rate_limit_seconds(body)) is not None:
             self.challenge_timeout = time.monotonic() + seconds
             logger.info("Rate limited; pausing matchmaking for %.0fs", seconds)
