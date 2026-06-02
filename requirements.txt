@@ -1,5 +1,5 @@
 aiohttp ~= 3.12
 chess ~= 1.11.2
 PyYAML ~= 6.0
-python-dotenv==1.1.1
+python-dotenv==1.2.2
 pydantic ~= 2.9
