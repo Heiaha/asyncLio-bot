@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import random
 import time
@@ -111,7 +110,9 @@ class Lichess:
     async def backoff(response: aiohttp.ClientResponse | None, attempt: int) -> None:
         if response is not None and response.status == HTTPStatus.TOO_MANY_REQUESTS:
             await asyncio.sleep(60)
-        await asyncio.sleep(2**attempt + random.random())
+        # Cap the exponential term so an endlessly-reconnecting stream (e.g.
+        # iter_lines) doesn't drift into hour-long sleeps.
+        await asyncio.sleep(min(2**attempt, 60) + random.random())
 
     async def post(
         self, endpoint: str, retry: bool = True, **kwargs
@@ -174,19 +175,26 @@ class Lichess:
             attempt += 1
 
     @staticmethod
-    def parse_line(endpoint: str, line: str) -> dict | None:
+    def parse_line(endpoint: str, line: str) -> str | None:
+        # Empty keepalive lines mean "still connected"; the callers turn those
+        # into a ping. Data lines are handed off raw for model_validate_json.
         if not line.strip():
             return None
-        event = json.loads(line)
-        logger.debug("Event %s: %s", endpoint, event)
-        return event
+        logger.debug("Event %s: %s", endpoint, line.rstrip())
+        return line
 
     async def event_stream(self) -> AsyncIterator[StreamEvent]:
         endpoint = "/api/stream/event"
+        attempt = 0
         while True:  # in case the event stream expires
             async for line in self.iter_lines(endpoint):
+                attempt = 0
                 event = self.parse_line(endpoint, line)
                 yield PingEvent() if event is None else parse_event(event)
+            # iter_lines also returns on a fatal client error (e.g. a 401 from a
+            # bad token); back off so we don't tight-loop reconnecting.
+            await self.backoff(None, attempt)
+            attempt += 1
 
     async def game_stream(self, game_id: str) -> AsyncIterator[GameStreamEvent]:
         endpoint = f"/api/bot/game/stream/{game_id}"
@@ -198,7 +206,7 @@ class Lichess:
         endpoint = "/api/bot/online"
         async for line in self.iter_lines(endpoint):
             if event := self.parse_line(endpoint, line):
-                yield OnlineBot.model_validate(event)
+                yield OnlineBot.model_validate_json(event)
 
     async def accept_challenge(self, challenge_id: str) -> None:
         await self.post(f"/api/challenge/{challenge_id}/accept")

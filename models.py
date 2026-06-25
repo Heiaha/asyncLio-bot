@@ -1,6 +1,14 @@
-from typing import Literal, Union
+from typing import Annotated, Literal, Union
 
-from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
+from pydantic import (
+    AliasChoices,
+    AliasPath,
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    ValidationError,
+)
 
 from enums import Event, GameEvent, GameStatus, Speed, Variant
 
@@ -38,12 +46,12 @@ class GameEventInfo(LichessModel):
 
 
 class GameStartEvent(LichessModel):
-    type: Event = Event.GAME_START
+    type: Literal[Event.GAME_START] = Event.GAME_START
     game: GameEventInfo
 
 
 class GameFinishEvent(LichessModel):
-    type: Event = Event.GAME_FINISH
+    type: Literal[Event.GAME_FINISH] = Event.GAME_FINISH
     game: GameEventInfo
 
 
@@ -64,51 +72,50 @@ class ChallengeInfo(LichessModel):
 
 
 class ChallengeEvent(LichessModel):
-    type: Event = Event.CHALLENGE
+    type: Literal[Event.CHALLENGE] = Event.CHALLENGE
     challenge: ChallengeInfo
 
 
 class ChallengeCanceledEvent(LichessModel):
-    type: Event = Event.CHALLENGE_CANCELED
+    type: Literal[Event.CHALLENGE_CANCELED] = Event.CHALLENGE_CANCELED
     challenge: ChallengeInfo
 
 
 class PingEvent(LichessModel):
-    type: Event = Event.PING
+    type: Literal[Event.PING] = Event.PING
 
 
 class UnknownEvent(LichessModel):
-    type: Event = Event.UNKNOWN
+    type: Literal[Event.UNKNOWN] = Event.UNKNOWN
 
 
-StreamEvent = Union[
-    GameStartEvent,
-    GameFinishEvent,
-    ChallengeEvent,
-    ChallengeCanceledEvent,
-    PingEvent,
-    UnknownEvent,
+StreamEvent = Annotated[
+    Union[
+        GameStartEvent,
+        GameFinishEvent,
+        ChallengeEvent,
+        ChallengeCanceledEvent,
+        PingEvent,
+        UnknownEvent,
+    ],
+    Field(discriminator="type"),
 ]
 
+stream_event_adapter = TypeAdapter(StreamEvent)
 
-def parse_event(raw: dict) -> StreamEvent:
-    event_type = Event(raw.get("type", "unknown"))
-    if event_type == Event.GAME_START:
-        return GameStartEvent.model_validate(raw)
-    if event_type == Event.GAME_FINISH:
-        return GameFinishEvent.model_validate(raw)
-    if event_type == Event.CHALLENGE:
-        return ChallengeEvent.model_validate(raw)
-    if event_type == Event.CHALLENGE_CANCELED:
-        return ChallengeCanceledEvent.model_validate(raw)
-    if event_type == Event.PING:
-        return PingEvent.model_validate(raw)
-    return UnknownEvent.model_validate(raw)
+
+def parse_event(raw: str | bytes) -> StreamEvent:
+    # Lichess sends events we don't model (e.g. challengeDeclined); fall back to
+    # UnknownEvent so an unmodeled type doesn't crash the stream.
+    try:
+        return stream_event_adapter.validate_json(raw)
+    except ValidationError:
+        return UnknownEvent()
 
 
 # Game stream (/api/bot/game/stream/{game_id})
 class GameState(LichessModel):
-    type: GameEvent = GameEvent.GAME_STATE
+    type: Literal[GameEvent.GAME_STATE] = GameEvent.GAME_STATE
     moves: str
     wtime: int
     btime: int
@@ -119,39 +126,40 @@ class GameState(LichessModel):
 
 
 class GameFull(LichessModel):
-    type: GameEvent = GameEvent.GAME_FULL
+    type: Literal[GameEvent.GAME_FULL] = GameEvent.GAME_FULL
     state: GameState
 
 
 class OpponentGone(LichessModel):
-    type: GameEvent = GameEvent.OPPONENT_GONE
+    type: Literal[GameEvent.OPPONENT_GONE] = GameEvent.OPPONENT_GONE
     claim_win_in_seconds: int | None = Field(
         default=None, alias="claimWinInSeconds"
     )
 
 
 class GamePing(LichessModel):
-    type: GameEvent = GameEvent.PING
+    type: Literal[GameEvent.PING] = GameEvent.PING
 
 
 class GameUnknown(LichessModel):
-    type: GameEvent = GameEvent.UNKNOWN
+    type: Literal[GameEvent.UNKNOWN] = GameEvent.UNKNOWN
 
 
-GameStreamEvent = Union[GameFull, GameState, OpponentGone, GamePing, GameUnknown]
+GameStreamEvent = Annotated[
+    Union[GameFull, GameState, OpponentGone, GamePing, GameUnknown],
+    Field(discriminator="type"),
+]
+
+game_stream_adapter = TypeAdapter(GameStreamEvent)
 
 
-def parse_game_event(raw: dict) -> GameStreamEvent:
-    event_type = GameEvent(raw.get("type", "unknown"))
-    if event_type == GameEvent.GAME_FULL:
-        return GameFull.model_validate(raw)
-    if event_type == GameEvent.GAME_STATE:
-        return GameState.model_validate(raw)
-    if event_type == GameEvent.OPPONENT_GONE:
-        return OpponentGone.model_validate(raw)
-    if event_type == GameEvent.PING:
-        return GamePing.model_validate(raw)
-    return GameUnknown.model_validate(raw)
+def parse_game_event(raw: str | bytes) -> GameStreamEvent:
+    # Mirror parse_event: route any unmodeled game-stream type to GameUnknown
+    # rather than failing validation.
+    try:
+        return game_stream_adapter.validate_json(raw)
+    except ValidationError:
+        return GameUnknown()
 
 
 # /api/bot/online

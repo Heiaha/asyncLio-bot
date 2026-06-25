@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import time
 from collections import deque
 from typing import NoReturn
@@ -13,10 +14,13 @@ from models import (
     ChallengeCanceledEvent,
     ChallengeEvent,
     GameFinishEvent,
-    GameStartEvent,
+    GameStartEvent, PingEvent,
 )
 
 logger = logging.getLogger(__name__)
+
+WATCHDOG_INTERVAL_SECONDS = 5
+HEALTH_TIMEOUT_SECONDS = 120
 
 
 class GameManager:
@@ -28,6 +32,8 @@ class GameManager:
         self.last_event_time: float = time.monotonic()
         self.blocklist: set[str] = set()
         self.last_blocklist_refresh: float = 0.0
+        self.last_ping: float = time.monotonic()
+        self.watchdog_task: asyncio.Task | None = None
 
     async def watch_event_stream(self) -> NoReturn:
         self.blocklist = await self.li.fetch_blocklist()
@@ -35,20 +41,52 @@ class GameManager:
         if self.blocklist:
             logger.info("Blocklist contains %d users", len(self.blocklist))
 
+        # The restart policy can only recover the process if the watchdog brings
+        # it down, so only run it inside Docker where one exists.
+        if self.in_docker():
+            self.watchdog_task = asyncio.create_task(self._watchdog())
+
         async for event in self.li.event_stream():
-            match event.type:
-                case Event.PING:
+            match event:
+                case PingEvent():
                     await self.on_ping()
-                case Event.GAME_START:
+                case GameStartEvent():
                     await self.on_game_start(event)
-                case Event.GAME_FINISH:
+                case GameFinishEvent():
                     await self.on_game_finish(event)
-                case Event.CHALLENGE:
+                case ChallengeEvent():
                     await self.on_challenge(event)
-                case Event.CHALLENGE_CANCELED:
+                case ChallengeCanceledEvent():
                     self.on_challenge_canceled(event)
 
+    @staticmethod
+    def in_docker() -> bool:
+        # Docker creates this marker file in every container; it's the simplest
+        # reliable signal that a restart policy is around to recover us.
+        return os.path.exists("/.dockerenv")
+
+    def is_healthy(self) -> bool:
+        return time.monotonic() - self.last_ping < HEALTH_TIMEOUT_SECONDS
+
+    async def _watchdog(self) -> None:
+        # Nothing restarts an unhealthy-but-running container under
+        # `restart: unless-stopped`, so the watchdog exits the process to let the
+        # restart policy recover it. os._exit rather than raising: an exception
+        # in a background task is swallowed and would leave the wedged process
+        # running, so we bring it down directly.
+        while True:
+            await asyncio.sleep(WATCHDOG_INTERVAL_SECONDS)
+            if not self.is_healthy():
+                idle = time.monotonic() - self.last_ping
+                logger.critical(
+                    "Unhealthy: no ping for %.0fs; exiting to trigger restart",
+                    idle,
+                )
+                os._exit(1)
+
     async def on_ping(self) -> None:
+        self.last_ping = time.monotonic()
+
         # Sometimes the lichess game loop seems to close without the event loop sending a "gameFinish" event
         # but still having closed the game stream. This will take care of those cases.
         self.current_games = {
