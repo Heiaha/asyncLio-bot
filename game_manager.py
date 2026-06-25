@@ -6,7 +6,7 @@ from collections import deque
 from typing import NoReturn
 
 from config import CONFIG
-from enums import ChallengeMode, ChallengeOpponent, DeclineReason, Event, Variant
+from enums import ChallengeMode, ChallengeOpponent, DeclineReason, Variant
 from game import Game
 from lichess import Lichess
 from matchmaker import Matchmaker
@@ -14,7 +14,8 @@ from models import (
     ChallengeCanceledEvent,
     ChallengeEvent,
     GameFinishEvent,
-    GameStartEvent, PingEvent,
+    GameStartEvent,
+    PingEvent,
 )
 
 logger = logging.getLogger(__name__)

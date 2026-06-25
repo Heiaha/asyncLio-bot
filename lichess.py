@@ -114,9 +114,7 @@ class Lichess:
         # iter_lines) doesn't drift into hour-long sleeps.
         await asyncio.sleep(min(2**attempt, 60) + random.random())
 
-    async def post(
-        self, endpoint: str, retry: bool = True, **kwargs
-    ) -> dict | None:
+    async def post(self, endpoint: str, retry: bool = True, **kwargs) -> dict | None:
         """POST to `endpoint`, retrying transient failures.
 
         Returns the parsed JSON response body, or None if no JSON response was

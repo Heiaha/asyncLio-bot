@@ -59,7 +59,7 @@ class Matchmaker:
             and not info.tos_violation
             and info.username.lower() not in blocklist
         ]
-        
+
         try:
             me = next(bot for bot in bots if bot.name == self.li.username)
         except StopIteration:

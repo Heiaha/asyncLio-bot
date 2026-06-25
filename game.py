@@ -221,9 +221,7 @@ class Game:
         clock = self.clock.copy()
 
         clock_name = "white_clock" if self.color == chess.WHITE else "black_clock"
-        clock[clock_name] = max(
-            0, clock[clock_name] - CONFIG.move_overhead / 1000
-        )
+        clock[clock_name] = max(0, clock[clock_name] - CONFIG.move_overhead / 1000)
 
         limit = (
             chess.engine.Limit(**clock)
@@ -321,7 +319,9 @@ class Game:
                 case GameState():
                     should_make_move = self.update(event) and self.is_our_turn
 
-                case OpponentGone() if event.claim_win_in_seconds == 0 and not self.is_our_turn:
+                case OpponentGone() if (
+                    event.claim_win_in_seconds == 0 and not self.is_our_turn
+                ):
                     logger.info("%s -- Attempting to claim victory", self.id)
                     await self.li.claim_victory(self.id)
 

@@ -132,9 +132,7 @@ class GameFull(LichessModel):
 
 class OpponentGone(LichessModel):
     type: Literal[GameEvent.OPPONENT_GONE] = GameEvent.OPPONENT_GONE
-    claim_win_in_seconds: int | None = Field(
-        default=None, alias="claimWinInSeconds"
-    )
+    claim_win_in_seconds: int | None = Field(default=None, alias="claimWinInSeconds")
 
 
 class GamePing(LichessModel):
