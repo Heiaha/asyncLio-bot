@@ -7,6 +7,7 @@ engine:
   uci_options:                # Arbitrary UCI options passed to the engine. Can be commented out or changed.
 #    Threads: 1               # Max CPU threads the engine can use.
 #    Hash: 128                # Hash size (in MB).
+#    UCI_ShowWDL: true        # Report win/draw/loss probabilities alongside the score (if the engine supports it).
 
 books:
   enabled: false

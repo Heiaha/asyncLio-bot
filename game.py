@@ -138,12 +138,13 @@ class Game:
     def format_engine_move_message(
         self, move: chess.Move, info: chess.engine.InfoDict, search_time: float
     ) -> str:
-        return "{id} -- Engine: {move_number}{ellipses} {move:<10}Score: {score!s:<10}Time: {time:<10.1f}Depth: {depth:<10}NPS: {nps:<15}PV: {pv!s:<30}".format(
+        return "{id} -- Engine: {move_number}{ellipses} {move:<10}Score: {score!s:<10}WDL: {wdl!s:<15}Time: {time:<10.1f}Depth: {depth:<10}NPS: {nps:<15}PV: {pv!s:<30}".format(
             id=self.id,
             move_number=self.board.fullmove_number,
             ellipses="." if self.board.turn == chess.WHITE else "...",
             move=move.uci(),
             score=score.pov(self.color) if (score := info.get("score")) else None,
+            wdl="/".join(str(n) for n in wdl.pov(self.color)) if (wdl := info.get("wdl")) else None,
             time=search_time,
             depth=info.get("depth", 1),
             nps=info.get("nps", 0),
