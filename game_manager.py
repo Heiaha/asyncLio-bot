@@ -79,16 +79,23 @@ class GameManager:
         # `restart: unless-stopped`, so the watchdog exits the process to let the
         # restart policy recover it. os._exit rather than raising: an exception
         # outside the main thread can't stop the process and would leave it
-        # wedged, so we bring it down directly.
-        while True:
-            time.sleep(WATCHDOG_INTERVAL_SECONDS)
-            if not self.is_healthy():
-                idle = time.monotonic() - self.last_ping
-                logger.critical(
-                    "Unhealthy: no ping for %.0fs; exiting to trigger restart",
-                    idle,
-                )
-                os._exit(1)
+        # wedged, so we bring it down directly. A crashed watchdog protects
+        # nothing, so any escaping exception also exits (fail closed); os._exit
+        # skips finally clauses, making the healthy-exit path unambiguous.
+        try:
+            while True:
+                time.sleep(WATCHDOG_INTERVAL_SECONDS)
+                if not self.is_healthy():
+                    idle = time.monotonic() - self.last_ping
+                    logger.critical(
+                        "Unhealthy: no ping for %.0fs; exiting to trigger restart",
+                        idle,
+                    )
+                    os._exit(1)
+        except BaseException:
+            logger.exception("Watchdog crashed; exiting to trigger restart")
+        finally:
+            os._exit(1)
 
     async def on_ping(self) -> None:
         self.last_ping = time.monotonic()
