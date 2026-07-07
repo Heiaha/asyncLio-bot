@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import threading
 import time
 from collections import deque
 from typing import NoReturn
@@ -34,7 +35,7 @@ class GameManager:
         self.blocklist: set[str] = set()
         self.last_blocklist_refresh: float = 0.0
         self.last_ping: float = time.monotonic()
-        self.watchdog_task: asyncio.Task | None = None
+        self.watchdog_thread: threading.Thread | None = None
 
     async def watch_event_stream(self) -> NoReturn:
         self.blocklist = await self.li.fetch_blocklist()
@@ -45,7 +46,8 @@ class GameManager:
         # The restart policy can only recover the process if the watchdog brings
         # it down, so only run it inside Docker where one exists.
         if self.in_docker():
-            self.watchdog_task = asyncio.create_task(self._watchdog())
+            self.watchdog_thread = threading.Thread(target=self.watchdog, daemon=True)
+            self.watchdog_thread.start()
 
         async for event in self.li.event_stream():
             match event:
@@ -69,14 +71,17 @@ class GameManager:
     def is_healthy(self) -> bool:
         return time.monotonic() - self.last_ping < HEALTH_TIMEOUT_SECONDS
 
-    async def _watchdog(self) -> None:
+    def watchdog(self) -> NoReturn:
+        # Runs in its own OS thread: an asyncio watchdog is starved by the very
+        # condition it must detect (a blocked event loop), whereas a thread only
+        # needs a CPU timeslice to keep ticking.
         # Nothing restarts an unhealthy-but-running container under
         # `restart: unless-stopped`, so the watchdog exits the process to let the
         # restart policy recover it. os._exit rather than raising: an exception
-        # in a background task is swallowed and would leave the wedged process
-        # running, so we bring it down directly.
+        # outside the main thread can't stop the process and would leave it
+        # wedged, so we bring it down directly.
         while True:
-            await asyncio.sleep(WATCHDOG_INTERVAL_SECONDS)
+            time.sleep(WATCHDOG_INTERVAL_SECONDS)
             if not self.is_healthy():
                 idle = time.monotonic() - self.last_ping
                 logger.critical(
