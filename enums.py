@@ -128,6 +128,12 @@ class BookSelection(StrEnum):
     BEST_MOVE = "best_move"
 
 
+class ExplorerSource(StrEnum):
+    MASTERS = "masters"
+    LICHESS = "lichess"
+    PLAYER = "player"
+
+
 class DeclineReason(StrEnum):
     GENERIC = "generic"
     LATER = "later"

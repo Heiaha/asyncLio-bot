@@ -22,6 +22,22 @@ books:
   atomic:                     # List of book file paths for variant atomic.
     - path/to/atomic
 
+explorer:                     # Play opening moves from the lichess opening explorer (explorer.lichess.ovh).
+  enabled: false              # Tried before local books; books and then the engine act as fallbacks.
+  source: masters             # One from masters (OTB master games), lichess (online games), or player.
+#  player: DrNykterstein      # Whose games to play from (required for source player).
+  depth: 10                   # Maximum fullmove number to query the explorer for.
+  min_games: 10               # Minimum games a move needs in the database to be playable.
+  min_time: 20                # Only query with at least this much time (in s) left on our clock.
+  timeout: 5                  # Time (in s) to wait for an explorer response before falling back.
+  speeds:                     # Game speeds to include (sources lichess and player).
+    - blitz
+    - rapid
+    - classical
+  ratings:                    # Rating buckets to include (source lichess only).
+    - 2200
+    - 2500
+
 challenge:                    # Incoming challenges.
   enabled: true               # Flag for controlling if any challenges get accepted. Overrides all other flags.
   max_increment: 60           # Maximum amount of increment to accept a challenge. The max is 180. Set to 0 for no increment.

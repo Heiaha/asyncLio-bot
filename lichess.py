@@ -9,9 +9,10 @@ import aiohttp
 import chess
 
 from config import CONFIG
-from enums import DeclineReason
+from enums import DeclineReason, ExplorerSource, Variant
 from models import (
     Account,
+    ExplorerResponse,
     GamePing,
     GameStreamEvent,
     OnlineBot,
@@ -48,6 +49,7 @@ class Lichess:
             cookie_jar=aiohttp.DummyCookieJar(),
         )
         self.challenge_timeout: float = 0.0
+        self.explorer_timeout: float = 0.0
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -238,6 +240,68 @@ class Lichess:
             f"/api/bot/game/{game_id}/move/{move.uci()}",
             params={"offeringDraw": str(offer_draw).lower()},
         )
+
+    async def explorer_moves(
+        self, variant: Variant, fen: str, color: str
+    ) -> ExplorerResponse | None:
+        if time.monotonic() < self.explorer_timeout:
+            return None
+
+        cfg = CONFIG.explorer
+        speeds = ",".join(cfg.speeds)
+        if cfg.source == ExplorerSource.MASTERS:
+            endpoint = "https://explorer.lichess.ovh/masters"
+            params = {"fen": fen, "moves": 20, "topGames": 0}
+        elif cfg.source == ExplorerSource.LICHESS:
+            endpoint = "https://explorer.lichess.ovh/lichess"
+            params = {
+                "variant": variant.value,
+                "fen": fen,
+                "moves": 20,
+                "speeds": speeds,
+                "ratings": ",".join(str(rating) for rating in cfg.ratings),
+                "topGames": 0,
+                "recentGames": 0,
+            }
+        else:
+            endpoint = "https://explorer.lichess.ovh/player"
+            params = {
+                "player": cfg.player,
+                "color": color,
+                "variant": variant.value,
+                "fen": fen,
+                "moves": 20,
+                "speeds": speeds,
+                "modes": "casual,rated",
+                "recentGames": 0,
+            }
+
+        # /player streams ndjson lines as the player's games are indexed, each
+        # line more complete than the last; keep the latest one that arrives
+        # before the timeout. /masters and /lichess send a single JSON body.
+        result = None
+        try:
+            async with self.client.get(
+                endpoint,
+                params=params,
+                timeout=aiohttp.ClientTimeout(total=cfg.timeout),
+            ) as response:
+                if response.status == HTTPStatus.TOO_MANY_REQUESTS:
+                    logger.warning("Explorer rate limited; pausing lookups for 60s")
+                    self.explorer_timeout = time.monotonic() + 60
+                    return None
+                if not response.ok:
+                    self.log_client_error(response, endpoint)
+                    return None
+                async for line in response.content:
+                    if line.strip():
+                        result = ExplorerResponse.model_validate_json(line)
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            logger.warning("Connection error on %s", endpoint)
+        except Exception as e:
+            logger.exception("Error %s on %s", e, endpoint)
+            return None
+        return result
 
     async def create_challenge(
         self, opponent: str, initial_time: int, increment: int = 0

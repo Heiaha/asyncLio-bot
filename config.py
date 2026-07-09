@@ -5,7 +5,14 @@ from typing import get_origin
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
-from enums import BookSelection, ChallengeMode, ChallengeOpponent, Speed, Variant
+from enums import (
+    BookSelection,
+    ChallengeMode,
+    ChallengeOpponent,
+    ExplorerSource,
+    Speed,
+    Variant,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +67,28 @@ class BooksConfig(ConfigModel):
 
     def for_variant(self, variant: Variant) -> list[str]:
         return self.by_variant.get(variant.value, [])
+
+
+class ExplorerConfig(ConfigModel):
+    enabled: bool = False
+    source: ExplorerSource = ExplorerSource.MASTERS
+    player: str | None = None
+    depth: int = 10
+    min_games: int = 10
+    min_time: int = 20
+    timeout: int = 5
+    speeds: list[Speed] = Field(
+        default_factory=lambda: [Speed.BLITZ, Speed.RAPID, Speed.CLASSICAL]
+    )
+    ratings: list[int] = Field(default_factory=lambda: [2200, 2500])
+
+    @model_validator(mode="after")
+    def player_required_for_player_source(self):
+        if self.enabled and self.source == ExplorerSource.PLAYER and not self.player:
+            raise ValueError(
+                "explorer.player must be set when explorer.source is 'player'"
+            )
+        return self
 
 
 class RatingDiffs(ConfigModel):
@@ -117,6 +146,7 @@ class Config(ConfigModel):
     move_overhead: int = 0
     engine: EngineConfig
     books: BooksConfig = Field(default_factory=BooksConfig)
+    explorer: ExplorerConfig = Field(default_factory=ExplorerConfig)
     challenge: ChallengeConfig = Field(default_factory=ChallengeConfig)
     draw: DrawConfig = Field(default_factory=DrawConfig)
     resign: ResignConfig = Field(default_factory=ResignConfig)

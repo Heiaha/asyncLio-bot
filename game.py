@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 import time
 
 import chess
@@ -8,7 +9,7 @@ import chess.polyglot
 import chess.variant
 
 from config import CONFIG
-from enums import GameStatus, Variant, BookSelection
+from enums import GameStatus, Variant, BookSelection, ExplorerSource
 from lichess import Lichess
 from models import GameFull, GameStartEvent, GamePing, GameState, OpponentGone
 
@@ -127,9 +128,10 @@ class Game:
             for score in self.scores[-cfg.moves :]
         )
 
-    def format_book_move_message(self, move: chess.Move) -> str:
-        return "{id} -- Book: {move_number}{ellipses} {move}".format(
+    def format_instant_move_message(self, move: chess.Move, source: str) -> str:
+        return "{id} -- {source}: {move_number}{ellipses} {move}".format(
             id=self.id,
+            source=source,
             move_number=self.board.fullmove_number,
             ellipses="." if self.board.turn == chess.WHITE else "...",
             move=move.uci(),
@@ -218,6 +220,56 @@ class Game:
                 board.pop()
         return None
 
+    def should_use_explorer(self) -> bool:
+        cfg = CONFIG.explorer
+        if not cfg.enabled:
+            return False
+
+        # The masters and player databases only hold standard chess; the
+        # lichess database can be queried per variant.
+        if cfg.source != ExplorerSource.LICHESS and self.variant not in (
+            Variant.STANDARD,
+            Variant.FROM_POSITION,
+        ):
+            return False
+
+        if self.board.fullmove_number > cfg.depth:
+            return False
+
+        clock_name = "white_clock" if self.color == chess.WHITE else "black_clock"
+        return self.clock[clock_name] >= cfg.min_time
+
+    async def get_explorer_move(self) -> chess.Move | None:
+        variant = (
+            Variant.STANDARD if self.variant == Variant.FROM_POSITION else self.variant
+        )
+        color = "white" if self.board.turn == chess.WHITE else "black"
+        response = await self.li.explorer_moves(variant, self.board.fen(), color)
+        if response is None:
+            return None
+
+        candidates = [
+            entry
+            for entry in response.moves
+            if entry.games >= CONFIG.explorer.min_games
+        ]
+        board = self.board.copy()
+        while candidates:
+            entry = random.choices(
+                candidates, weights=[entry.games for entry in candidates]
+            )[0]
+            candidates.remove(entry)
+
+            try:
+                move = board.parse_san(entry.san)
+            except ValueError:
+                continue
+            board.push(move)
+            if not board.is_repetition(count=2):
+                return move
+            board.pop()
+        return None
+
     async def get_engine_move(self) -> (chess.Move, chess.engine.InfoDict):
         clock = self.clock.copy()
 
@@ -265,8 +317,13 @@ class Game:
         )
         self.ponder_move = None
 
+        if self.should_use_explorer() and (move := await self.get_explorer_move()):
+            logger.info(self.format_instant_move_message(move, "Explorer"))
+            await self.li.make_move(self.id, move)
+            return
+
         if self.should_use_book() and (move := self.get_book_move()):
-            logger.info(self.format_book_move_message(move))
+            logger.info(self.format_instant_move_message(move, "Book"))
             await self.li.make_move(self.id, move)
             return
 

@@ -160,6 +160,23 @@ def parse_game_event(raw: str | bytes) -> GameStreamEvent:
         return GameUnknown()
 
 
+# Opening explorer (https://explorer.lichess.ovh)
+class ExplorerMove(LichessModel):
+    uci: str
+    san: str
+    white: int
+    draws: int
+    black: int
+
+    @property
+    def games(self) -> int:
+        return self.white + self.draws + self.black
+
+
+class ExplorerResponse(LichessModel):
+    moves: list[ExplorerMove] = Field(default_factory=list)
+
+
 # /api/bot/online
 class PerfInfo(LichessModel):
     rating: int = 1500
