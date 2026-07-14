@@ -17,7 +17,7 @@ services:
       - ALL
     user: "1000:1000"
     logging:
-      driver: json-file
+      driver: local
       options:
         max-size: "10m"
         max-file: "3"
