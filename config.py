@@ -3,7 +3,7 @@ import os
 from typing import get_origin
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from enums import (
     BookSelection,
@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 class ConfigModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     @model_validator(mode="before")
     @classmethod
     def empty_when_null(cls, data):
@@ -47,8 +49,8 @@ class BooksConfig(ConfigModel):
     enabled: bool = False
     selection: BookSelection = BookSelection.WEIGHTED_RANDOM
     depth: int = 10
-    # variant name (Variant.value) -> ordered list of polyglot book paths
-    by_variant: dict[str, list[str]] = Field(default_factory=dict)
+    # variant -> ordered list of polyglot book paths
+    by_variant: dict[Variant, list[str]] = Field(default_factory=dict)
 
     @model_validator(mode="before")
     @classmethod
@@ -66,7 +68,7 @@ class BooksConfig(ConfigModel):
         return data
 
     def for_variant(self, variant: Variant) -> list[str]:
-        return self.by_variant.get(variant.value, [])
+        return self.by_variant.get(variant, [])
 
 
 class ExplorerConfig(ConfigModel):
@@ -131,6 +133,15 @@ class MatchmakingConfig(ConfigModel):
     min_games: int = 0
     timeout: int = 1
     rated: bool = False
+
+    @model_validator(mode="after")
+    def time_controls_required_when_enabled(self):
+        if self.enabled and not (self.initial_times and self.increments):
+            raise ValueError(
+                "matchmaking.initial_times and matchmaking.increments must each "
+                "list at least one value when matchmaking is enabled"
+            )
+        return self
 
 
 class BlocklistConfig(ConfigModel):

@@ -37,6 +37,13 @@ class Lichess:
             headers=headers, cookie_jar=aiohttp.DummyCookieJar()
         ) as session:
             async with session.get("https://lichess.org/api/account") as response:
+                if not response.ok:
+                    logger.critical(
+                        "Could not log in to Lichess (%d %s). Check LICHESS_TOKEN.",
+                        response.status,
+                        response.reason,
+                    )
+                    response.raise_for_status()
                 account = Account.model_validate_json(await response.read())
         headers["User-Agent"] = f"asyncLio-bot user:{account.username}"
 

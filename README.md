@@ -16,14 +16,14 @@ To run asyncLio-bot using Docker:
 * `docker-compose up -d` - Start the bot in the background
 * `docker-compose logs -f` - View bot logs
 * `docker-compose down` - Stop the bot
-* `docker-compose restart` - Restart the bot
+* `docker-compose restart` - Restart the bot (e.g. to pick up changes to `config.yml`)
 
 ### Manual Installation
-To use asyncLio-bot (**requires Python 3.10 or later**):
+To use asyncLio-bot (**requires Python 3.11 or later**):
 * Clone the repo as `git clone https://github.com/Heiaha/asyncLio-bot.git`.
 * Copy `config.default.yml` to `config.yml` and customize to your liking.
-* Install the required packages in your environment (preferably using venv or conda) like `python -m pip install -r requirements.txt
-`.
+* Install the required packages in your environment (preferably using venv or conda) like `python -m pip install -r requirements.txt`.
+* Run the bot with `python main.py`.
 
 ## Lichess OAuth
 * Create an account for a BOT on [Lichess](https://lichess.org/signup).
