@@ -46,10 +46,11 @@ async def main(args: argparse.Namespace):
         if args.upgrade:
             if li.title == "BOT":
                 logger.warning("%s is already a BOT account", li.username)
-            else:
-                await li.upgrade_account()
+            elif await li.upgrade_account():
                 logger.info("Upgraded %s to a BOT account", li.username)
-                return
+            else:
+                logger.critical("Could not upgrade %s to a BOT account", li.username)
+            return
 
         if li.title != "BOT":
             logger.critical("asyncLio-bot can only be used by BOT accounts")

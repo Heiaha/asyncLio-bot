@@ -74,7 +74,7 @@ draw:                         # Whether to offer/accept draws under certain cond
   enabled: false
   score: 0                    # If engine score is less than or equal to this value, the bot offers/accepts draw (in cp).
   moves: 5                    # How many moves in a row the absolute value of the score has to be below the draw value.
-  min_game_length: 35         # Only offer/accept a draw if the number of full moves on board is fewer than this value.
+  min_game_length: 35         # Only offer/accept a draw once the game has reached at least this many full moves.
 
 resign:
   enabled: false

@@ -230,8 +230,9 @@ class Lichess:
     async def claim_victory(self, game_id: str) -> None:
         await self.post(f"/api/bot/game/{game_id}/claim-victory")
 
-    async def upgrade_account(self) -> None:
-        await self.post("/api/bot/account/upgrade")
+    async def upgrade_account(self) -> bool:
+        body = await self.post("/api/bot/account/upgrade")
+        return bool(body and body.get("ok"))
 
     async def make_move(
         self, game_id: str, move: chess.Move, *, offer_draw: bool = False

@@ -39,7 +39,6 @@ class TimeControl(LichessModel):
 class GameEventInfo(LichessModel):
     id: str = Field(validation_alias=AliasChoices("id", "gameId"))
     color: Literal["white", "black"]
-    fen: str
     variant: Variant = Field(validation_alias=AliasPath("variant", "key"))
     status: GameStatus = Field(validation_alias=AliasPath("status", "name"))
     opponent: str = Field(validation_alias=AliasPath("opponent", "username"))
@@ -127,6 +126,9 @@ class GameState(LichessModel):
 
 class GameFull(LichessModel):
     type: Literal[GameEvent.GAME_FULL] = GameEvent.GAME_FULL
+    # A FEN for chess960/fromPosition games; "startpos" (the variant's own
+    # starting setup) otherwise.
+    initial_fen: str = Field(alias="initialFen")
     state: GameState
 
 

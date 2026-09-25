@@ -24,14 +24,13 @@ class Game:
             chess.WHITE if event.game.color == "white" else chess.BLACK
         )
         self.opponent: str = event.game.opponent
-        self.initial_fen: str = event.game.fen
         self.variant: Variant = event.game.variant
         self.status: GameStatus = event.game.status
         self.scores: list[chess.engine.PovScore] = []
-        self.board: chess.Board = self.make_board()
         self.ponder_move: chess.Move | None = None
 
         # attributes to be set up asynchronously or after the game starts
+        self.board: chess.Board = chess.Board()
         self.clock: dict[str, float] = {
             "white_clock": 0,
             "black_clock": 0,
@@ -63,10 +62,9 @@ class Game:
 
     async def start_engine(self) -> None:
         logger.debug("%s -- Starting engine %s", self.id, CONFIG.engine.path)
-        transport, engine = await chess.engine.popen_uci(CONFIG.engine.path)
+        transport, self.engine = await chess.engine.popen_uci(CONFIG.engine.path)
         if options := CONFIG.engine.uci_options:
-            await engine.configure(options)
-        self.engine = engine
+            await self.engine.configure(options)
 
     def update(self, state: GameState) -> bool:
         self.status = state.status
@@ -82,22 +80,19 @@ class Game:
         if len(moves) <= len(self.board.move_stack):
             return False
 
-        self.board = self.make_board(moves)
+        board = self.board.root()
+        for move in moves:
+            board.push_uci(move)
+        self.board = board
         return True
 
-    def make_board(self, moves: list[str] | None = None) -> chess.Board:
+    def make_board(self, initial_fen: str) -> chess.Board:
         if self.variant == Variant.CHESS960:
-            board = chess.Board(self.initial_fen, chess960=True)
+            return chess.Board(initial_fen, chess960=True)
         elif self.variant == Variant.FROM_POSITION:
-            board = chess.Board(self.initial_fen)
-        else:
-            VariantBoard = chess.variant.find_variant(self.variant)
-            board = VariantBoard()
-
-        if moves:
-            for move in moves:
-                board.push_uci(move)
-        return board
+            return chess.Board(initial_fen)
+        VariantBoard = chess.variant.find_variant(self.variant)
+        return VariantBoard()
 
     def should_draw(self) -> bool:
         cfg = CONFIG.draw
@@ -146,7 +141,11 @@ class Game:
             ellipses="." if self.board.turn == chess.WHITE else "...",
             move=move.uci(),
             score=score.pov(self.color) if (score := info.get("score")) else None,
-            wdl=f"WDL: {'/'.join(str(n) for n in wdl.pov(self.color)):<15}" if (wdl := info.get("wdl")) else "",
+            wdl=(
+                f"WDL: {'/'.join(str(n) for n in wdl.pov(self.color)):<15}"
+                if (wdl := info.get("wdl"))
+                else ""
+            ),
             time=search_time,
             depth=info.get("depth", 1),
             nps=info.get("nps", 0),
@@ -360,7 +359,15 @@ class Game:
         await self.li.make_move(self.id, move, offer_draw=offer_draw)
 
     def start(self) -> None:
-        self.loop_task = asyncio.create_task(self.watch_game_stream())
+        self.loop_task = asyncio.create_task(self.run())
+
+    async def run(self) -> None:
+        try:
+            await self.watch_game_stream()
+        except Exception:
+            logger.exception("%s -- Game loop failed", self.id)
+            if self.engine is not None:
+                await self.engine.quit()
 
     async def watch_game_stream(self) -> None:
         start_time = time.monotonic()
@@ -371,6 +378,7 @@ class Game:
 
             match event:
                 case GameFull():
+                    self.board = self.make_board(event.initial_fen)
                     self.update(event.state)
                     should_make_move = self.is_our_turn
 
