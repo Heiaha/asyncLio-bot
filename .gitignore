@@ -1,0 +1,17 @@
+# Secrets and local config
+.env
+config.yml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Editors
+.idea/
+
+# User-supplied engine binaries and opening books (keep the dirs via .gitkeep)
+engines/*
+!engines/.gitkeep
+books/*
+!books/.gitkeep
