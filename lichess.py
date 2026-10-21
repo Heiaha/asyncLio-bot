@@ -111,46 +111,43 @@ class Lichess:
 
     @staticmethod
     def rate_limit_seconds(body: dict | None) -> float | None:
-        # A spent quota (e.g. the 100/day bot-vs-bot cap) comes back as
-        # {"ratelimit": {"seconds": N}}; other responses have no such field.
         return RateLimit.model_validate(body).seconds if body else None
 
     @staticmethod
     async def backoff(response: aiohttp.ClientResponse | None, attempt: int) -> None:
         if response is not None and response.status == HTTPStatus.TOO_MANY_REQUESTS:
             await asyncio.sleep(60)
-        # Cap the exponential term so an endlessly-reconnecting stream (e.g.
-        # iter_lines) doesn't drift into hour-long sleeps.
         await asyncio.sleep(min(2**attempt, 60) + random.random())
 
-    async def post(self, endpoint: str, retry: bool = True, **kwargs) -> dict | None:
-        """POST to `endpoint`, retrying transient failures.
-
-        Returns the parsed JSON response body, or None if no JSON response was
-        obtained (connection error, non-JSON body, or retries exhausted).
-        """
+    async def post(self, endpoint: str, retry: bool = True, **kwargs) -> bool:
+        """POST to `endpoint`, retrying transient failures."""
         for attempt in range(self.ATTEMPTS):
             try:
                 async with self.client.post(endpoint, **kwargs) as response:
                     body = await response.json()
                     if response.ok:
-                        return body
-                    if self.is_fatal_client_error(response):
-                        self.log_client_error(response, endpoint)
-                        return body
-                    if not retry:
-                        return body
-            except (aiohttp.ClientError, asyncio.TimeoutError):
-                logger.warning("Connection error on %s", endpoint)
+                        return True
+                    self.log_client_error(response, endpoint)
+                    if (seconds := self.rate_limit_seconds(body)) is not None:
+                        self.challenge_timeout = time.monotonic() + seconds
+                        logger.info(
+                            "Rate limited; pausing matchmaking for %.0fs", seconds
+                        )
+                    if self.is_fatal_client_error(response) or not retry:
+                        return False
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                logger.warning("Connection error on %s: %s", endpoint, e)
+                if not retry:
+                    return False
                 await self.backoff(None, attempt)
             except Exception as e:
                 logger.exception("Error %s on %s", e, endpoint)
-                return None
+                return False
             else:
                 await self.backoff(response, attempt)
 
         logger.warning("Giving up requests on %s", endpoint)
-        return None
+        return False
 
     async def iter_lines(self, endpoint: str) -> AsyncIterator[str]:
         """Stream raw lines from `endpoint`, reconnecting on transient errors.
@@ -165,6 +162,10 @@ class Lichess:
                 async with self.client.get(endpoint) as response:
                     if response.ok:
                         async for line in response.content:
+                            # Reset only once data flows: resetting on
+                            # response.ok alone would tight-loop against a
+                            # server that accepts and then drops us.
+                            attempt = 0
                             yield line.decode()
                         return
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
@@ -174,8 +175,8 @@ class Lichess:
             except Exception:
                 logger.exception("Unexpected error on event stream %s", endpoint)
             else:
+                self.log_client_error(response, endpoint)
                 if self.is_fatal_client_error(response):
-                    self.log_client_error(response, endpoint)
                     return
 
             await self.backoff(response, attempt)
@@ -216,20 +217,25 @@ class Lichess:
                 yield OnlineBot.model_validate_json(event)
 
     async def accept_challenge(self, challenge_id: str) -> None:
-        await self.post(f"/api/challenge/{challenge_id}/accept")
+        accepted = await self.post(f"/api/challenge/{challenge_id}/accept", retry=False)
+        if not accepted and time.monotonic() < self.challenge_timeout:
+            logger.info("%s -- Rate limited on accept; declining", challenge_id)
+            await self.decline_challenge(challenge_id, reason=DeclineReason.LATER)
 
     async def decline_challenge(
         self, challenge_id: str, *, reason: DeclineReason = DeclineReason.GENERIC
     ) -> None:
         await self.post(
-            f"/api/challenge/{challenge_id}/decline", data={"reason": reason}
+            f"/api/challenge/{challenge_id}/decline",
+            data={"reason": reason},
+            retry=False,
         )
 
     async def cancel_challenge(self, challenge_id: str) -> None:
         await self.post(f"/api/challenge/{challenge_id}/cancel")
 
-    async def abort_game(self, game_id: str) -> None:
-        await self.post(f"/api/bot/game/{game_id}/abort")
+    async def abort_game(self, game_id: str, *, retry: bool = True) -> None:
+        await self.post(f"/api/bot/game/{game_id}/abort", retry=retry)
 
     async def resign_game(self, game_id: str) -> None:
         await self.post(f"/api/bot/game/{game_id}/resign")
@@ -238,8 +244,7 @@ class Lichess:
         await self.post(f"/api/bot/game/{game_id}/claim-victory")
 
     async def upgrade_account(self) -> bool:
-        body = await self.post("/api/bot/account/upgrade")
-        return bool(body and body.get("ok"))
+        return await self.post("/api/bot/account/upgrade")
 
     async def make_move(
         self, game_id: str, move: chess.Move, *, offer_draw: bool = False
@@ -314,7 +319,7 @@ class Lichess:
     async def create_challenge(
         self, opponent: str, initial_time: int, increment: int = 0
     ) -> None:
-        body = await self.post(
+        await self.post(
             f"/api/challenge/{opponent}",
             data={
                 "rated": str(CONFIG.matchmaking.rated).lower(),
@@ -325,6 +330,3 @@ class Lichess:
             },
             retry=False,
         )
-        if (seconds := self.rate_limit_seconds(body)) is not None:
-            self.challenge_timeout = time.monotonic() + seconds
-            logger.info("Rate limited; pausing matchmaking for %.0fs", seconds)

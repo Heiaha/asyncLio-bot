@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import random
 from typing import Any
@@ -8,6 +9,8 @@ from lichess import Lichess
 from models import OnlineBot, PerfInfo
 
 logger = logging.getLogger(__name__)
+
+ONLINE_BOTS_TIMEOUT_SECONDS = 30
 
 
 class Bot:
@@ -52,13 +55,21 @@ class Matchmaker:
         self.li: Lichess = li
 
     async def challenge(self, blocklist: set[str]) -> None:
-        bots = [
-            Bot(info)
-            async for info in self.li.get_online_bots()
-            if not info.disabled
-            and not info.tos_violation
-            and info.username.lower() not in blocklist
-        ]
+        try:
+            async with asyncio.timeout(ONLINE_BOTS_TIMEOUT_SECONDS):
+                bots = [
+                    Bot(info)
+                    async for info in self.li.get_online_bots()
+                    if not info.disabled
+                    and not info.tos_violation
+                    and info.username.lower() not in blocklist
+                ]
+        except TimeoutError:
+            logger.warning(
+                "Timed out fetching online bots after %ds; skipping matchmaking",
+                ONLINE_BOTS_TIMEOUT_SECONDS,
+            )
+            return
 
         try:
             me = next(bot for bot in bots if bot.name == self.li.username)

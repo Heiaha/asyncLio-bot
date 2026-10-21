@@ -22,6 +22,9 @@ from models import (
 logger = logging.getLogger(__name__)
 
 WATCHDOG_INTERVAL_SECONDS = 5
+# Only on_ping refreshes last_ping, and watch_event_stream awaits each handler
+# before reading the next event, so a slow handler looks exactly like a dead
+# stream. Every await on the event-consumer path must finish well under this.
 HEALTH_TIMEOUT_SECONDS = 120
 
 
@@ -133,7 +136,7 @@ class GameManager:
         # If this is an extremely late acceptance of a challenge we issued earlier
         # that would bring us over our concurrency limit, abort it.
         if not self.is_under_concurrency_limit():
-            await self.li.abort_game(game_id)
+            await self.li.abort_game(game_id, retry=False)
             return
 
         game = Game(self.li, event)
@@ -152,7 +155,6 @@ class GameManager:
         if (game_id := event.game.id) in self.current_games:
             game = self.current_games.pop(game_id)
             logger.info("%s finished", game)
-            await game.loop_task
 
         logger.info(
             "Games: %d, Challenges: %d",
